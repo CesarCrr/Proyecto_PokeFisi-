@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
 import os
+from utiles.estadisticas import obtener_estadisticas, resetear_estadisticas
 
 # Colores
 BG = "#1a1a2e"
@@ -84,7 +85,7 @@ class PokemonMenu(tk.Frame):
         self._resize_background(event.width, event.height)
     
     def _on_start(self):
-        """Inicia la batalla con la configuración seleccionada"""
+        #Inicia la batalla con la configuración seleccionada
         self.ai_level = self.ai_level_var.get()
         if self.modo == "simulation":
             self.ai2_level = self.ai2_level_var.get()
@@ -110,7 +111,7 @@ class PokemonMenu(tk.Frame):
             widget.destroy()
 
         self.container.place(relx=0.5, rely=0.5, anchor="center", width=550, height=550)
-        tk.Label(self.container, text="🎮 POKEFISI 🎮", font=("Courier", 24, "bold"), 
+        tk.Label(self.container, text=" POKEFISI ", font=("Courier", 24, "bold"), 
                 bg=PANEL_BG, fg=GOLD).pack(pady=(15, 5))
         tk.Label(self.container, text="Batallas Pokémon", font=("Courier", 10), 
                 bg=PANEL_BG, fg=TEXTCOL).pack(pady=(0, 15))
@@ -128,21 +129,29 @@ class PokemonMenu(tk.Frame):
         def on_mode_change():
             self.modo = self.modo_var.get()
 
-        rb1 = tk.Radiobutton(mode_frame, text="🎮 Jugador vs IA", variable=self.modo_var,
+        rb1 = tk.Radiobutton(mode_frame, text="Jugador vs IA", variable=self.modo_var,
                             value="pve", bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
                             font=("Courier", 10), activebackground=PANEL_BG, 
                             activeforeground=GOLD, command=on_mode_change)
         rb1.pack(anchor="w", pady=5)
 
-        rb2 = tk.Radiobutton(mode_frame, text="🤖 IA vs IA (Espectador)", variable=self.modo_var,
+        rb2 = tk.Radiobutton(mode_frame, text="IA vs IA (Espectador)", variable=self.modo_var,
                             value="simulation", bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
                             font=("Courier", 10), activebackground=PANEL_BG,
                             activeforeground=GOLD, command=on_mode_change)
         rb2.pack(anchor="w", pady=5)
+
+        # Boton estadisticas
+        tk.Button(self.container, text="ESTADÍSTICAS",
+                 font=("Courier", 10, "bold"),
+                 bg='#2d5a8e', fg=TEXTCOL, relief="flat", bd=0,
+                 padx=20, pady=6, cursor="hand2",
+                 activebackground='#3a70aa',
+                 command=self._show_statistics).pack(pady=(8, 0))
         tk.Frame(self.container, bg=PANEL_BG, height=20).pack()    
         btn_frame = tk.Frame(self.container, bg=PANEL_BG)
         btn_frame.pack(pady=10)      
-        tk.Button(btn_frame, text="▶  SIGUIENTE  ▶",
+        tk.Button(btn_frame, text="  SIGUIENTE  ",
                  font=("Courier", 12, "bold"),
                  bg=GREEN, fg="#1a1a2e", relief="flat", bd=0,
                  padx=35, pady=8, cursor="hand2",
@@ -156,7 +165,7 @@ class PokemonMenu(tk.Frame):
         panel_height = 680 if self.modo == "simulation" else 550
         self.container.place(relx=0.5, rely=0.5, anchor="center", width=550, height=panel_height)
 
-        tk.Label(self.container, text="🎮 POKEFISI 🎮", font=("Courier", 24, "bold"), 
+        tk.Label(self.container, text=" POKEFISI ", font=("Courier", 24, "bold"), 
                 bg=PANEL_BG, fg=GOLD).pack(pady=(15, 5))
         tk.Label(self.container, text="Configura la batalla", font=("Courier", 10), 
                 bg=PANEL_BG, fg=TEXTCOL).pack(pady=(0, 15))
@@ -176,14 +185,14 @@ class PokemonMenu(tk.Frame):
 
         self.ai_level_var = tk.IntVar(value=1)
 
-        rb_nivel1 = tk.Radiobutton(level_frame, text="Nivel 1 - Fácil (Aleatoria)", 
+        rb_nivel1 = tk.Radiobutton(level_frame, text="Nivel 1 - Fácil ", 
                                 variable=self.ai_level_var, value=1,
                                 bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
                                 font=("Courier", 10), activebackground=PANEL_BG,
                                 activeforeground=GOLD)
         rb_nivel1.pack(anchor="w", pady=5)
 
-        rb_nivel2 = tk.Radiobutton(level_frame, text="Nivel 2 - Medio (Heurística)", 
+        rb_nivel2 = tk.Radiobutton(level_frame, text="Nivel 2 - Medio ", 
                                 variable=self.ai_level_var, value=2,
                                 bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
                                 font=("Courier", 10), activebackground=PANEL_BG,
@@ -201,14 +210,14 @@ class PokemonMenu(tk.Frame):
             
             self.ai2_level_var = tk.IntVar(value=1)
             
-            rb2_nivel1 = tk.Radiobutton(level2_frame, text="Nivel 1 - Fácil (Aleatoria)", 
+            rb2_nivel1 = tk.Radiobutton(level2_frame, text="Nivel 1 - Fácil ", 
                                     variable=self.ai2_level_var, value=1,
                                     bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
                                     font=("Courier", 10), activebackground=PANEL_BG,
                                     activeforeground=GOLD)
             rb2_nivel1.pack(anchor="w", pady=5)
             
-            rb2_nivel2 = tk.Radiobutton(level2_frame, text="Nivel 2 - Medio (Heurística)", 
+            rb2_nivel2 = tk.Radiobutton(level2_frame, text="Nivel 2 - Medio ", 
                                     variable=self.ai2_level_var, value=2,
                                     bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
                                     font=("Courier", 10), activebackground=PANEL_BG,
@@ -244,14 +253,14 @@ class PokemonMenu(tk.Frame):
         btn_frame = tk.Frame(self.container, bg=PANEL_BG)
         btn_frame.pack(pady=10)
         #Botones
-        tk.Button(btn_frame, text="◀  ATRÁS  ◀",
+        tk.Button(btn_frame, text="  ATRÁS  ",
                  font=("Courier", 11, "bold"),
                  bg='#3a3a4e', fg=TEXTCOL, relief="flat", bd=0,
                  padx=25, pady=8, cursor="hand2",
                  activebackground="#4a4a5e",
                  command=self._back_step).pack(side="left", padx=10)
         
-        btn_text = "⚔  EMPEZAR BATALLA  ⚔" if self.modo == "pve" else "👁️  OBSERVAR BATALLA  👁️"
+        btn_text = "  EMPEZAR BATALLA  " if self.modo == "pve" else "OBSERVAR BATALLA"
         tk.Button(btn_frame, text=btn_text,
                  font=("Courier", 11, "bold"),
                  bg=GREEN, fg="#1a1a2e", relief="flat", bd=0,
@@ -259,6 +268,88 @@ class PokemonMenu(tk.Frame):
                  activebackground="#5ee89e",
                  command=self._on_start).pack(side="left", padx=10)
     
+    def _show_statistics(self):
+        #Muestra ventana con estadisticas de las IAs
+        stats = obtener_estadisticas()
+
+        win = tk.Toplevel(self.parent)
+        win.title("Estadísticas de IAs")
+        win.configure(bg=BG)
+        win.resizable(False, False)
+        win.grab_set()
+        win.transient(self.parent)
+        win.geometry("440x400")
+
+        tk.Label(win, text="ESTADÍSTICAS DE IAs",
+                 font=("Courier", 16, "bold"), bg=BG, fg=GOLD).pack(pady=(18, 4))
+        tk.Frame(win, bg=ACCENT, height=2).pack(fill="x", padx=30, pady=4)
+
+        def make_ia_panel(parent, titulo, clave, color):
+            ia_data = stats.get(clave, {"victorias": 0, "derrotas": 0})
+            victorias = ia_data.get("victorias", 0)
+            derrotas = ia_data.get("derrotas", 0)
+            total = victorias + derrotas
+            pct = f"{(victorias/total*100):.0f}%" if total > 0 else "---"
+
+            frame = tk.LabelFrame(parent, text=titulo,
+                                  font=("Courier", 11, "bold"),
+                                  bg=PANEL_BG, fg=color, padx=20, pady=10)
+            frame.pack(pady=8, padx=30, fill="x")
+
+            row = tk.Frame(frame, bg=PANEL_BG)
+            row.pack(fill="x")
+
+            tk.Label(row, text=f"Victorias: {victorias}",
+                     font=("Courier", 10), bg=PANEL_BG, fg="#4ade80").pack(side="left", padx=10)
+            tk.Label(row, text=f"Derrotas: {derrotas}",
+                     font=("Courier", 10), bg=PANEL_BG, fg=ACCENT).pack(side="left", padx=10)
+            tk.Label(row, text=f":D",
+                     font=("Courier", 10), bg=PANEL_BG, fg=TEXT2).pack(side="left", padx=10)
+
+        make_ia_panel(win, "IA NIVEL 1 - FÁCIL", "ia1", "#60a5fa")
+        make_ia_panel(win, "IA NIVEL 2 - MEDIO", "ia2", "#f59e0b")
+
+        tk.Frame(win, bg=BG, height=5).pack()
+        tk.Label(win, text="Las estadísticas incluyen batallas contra jugador y entre IAs.",
+                 font=("Courier", 8), bg=BG, fg=TEXT2, wraplength=380, justify="center").pack(pady=4)
+
+        btn_frame = tk.Frame(win, bg=BG)
+        btn_frame.pack(pady=10)
+
+        def confirmar_reset():
+            confirm = tk.Toplevel(win)
+            confirm.title("Confirmar")
+            confirm.configure(bg=BG)
+            confirm.resizable(False, False)
+            confirm.grab_set()
+            confirm.transient(win)
+            tk.Label(confirm, text="¿Reiniciar todas las estadísticas?",
+                     font=("Courier", 11), bg=BG, fg=TEXTCOL).pack(pady=16, padx=20)
+            bf = tk.Frame(confirm, bg=BG)
+            bf.pack(pady=8)
+            def do_reset():
+                resetear_estadisticas()
+                confirm.destroy()
+                win.destroy()
+                self._show_statistics()
+            tk.Button(bf, text="SÍ, REINICIAR",
+                      font=("Courier", 9, "bold"), bg=ACCENT, fg=TEXTCOL,
+                      relief="flat", bd=0, padx=12, pady=6, cursor="hand2",
+                      command=do_reset).pack(side="left", padx=8)
+            tk.Button(bf, text="CANCELAR",
+                      font=("Courier", 9, "bold"), bg='#3a3a4e', fg=TEXTCOL,
+                      relief="flat", bd=0, padx=12, pady=6, cursor="hand2",
+                      command=confirm.destroy).pack(side="left", padx=8)
+
+        tk.Button(btn_frame, text="REINICIAR ESTADÍSTICAS",
+                  font=("Courier", 9, "bold"), bg='#3a3a4e', fg=TEXT2,
+                  relief="flat", bd=0, padx=12, pady=6, cursor="hand2",
+                  command=confirmar_reset).pack(side="left", padx=8)
+        tk.Button(btn_frame, text="CERRAR",
+                  font=("Courier", 9, "bold"), bg='#2d5a8e', fg=TEXTCOL,
+                  relief="flat", bd=0, padx=12, pady=6, cursor="hand2",
+                  command=win.destroy).pack(side="left", padx=8)
+
     def _build_ui(self):
         for widget in self.winfo_children():
             if widget != self.bg_label:

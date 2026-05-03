@@ -8,6 +8,7 @@ from batalla.peligros import apply_hazards_on_switch
 from batalla.efectos import apply_move_effects
 from utiles.funciones_auxiliares import rand, clamp
 from ia.ia_levels import RandomAI, HeuristicAI
+from utiles.estadisticas import registrar_resultado_simulation
 
 # Colores
 TYPE_COLORS = {
@@ -94,12 +95,12 @@ class PokemonSimulationGUI(tk.Frame):
         mid.columnconfigure(0, weight=1)
         mid.columnconfigure(1, weight=1)
 
-        self.frame_blue = self._make_pokemon_panel(mid, "🔵 IA AZUL", BLUE_C, 0)
-        self.frame_red = self._make_pokemon_panel(mid, "🔴 IA ROJA", ACCENT, 1)
+        self.frame_blue = self._make_pokemon_panel(mid, "IA AZUL", BLUE_C, 0)
+        self.frame_red = self._make_pokemon_panel(mid, "IA ROJA", ACCENT, 1)
 
         log_frame = tk.Frame(self, bg=BG2, bd=1, relief="flat")
         log_frame.pack(fill="x", padx=12, pady=(0, 6))
-        tk.Label(log_frame, text="📋 LOG DE BATALLA", font=("Courier", 9, "bold"),
+        tk.Label(log_frame, text="LOG DE BATALLA", font=("Courier", 9, "bold"),
                  bg=BG2, fg=TEXT2).pack(anchor="w", padx=8, pady=(4,0))
         self.log_text = tk.Text(log_frame, height=10, bg=BG2, fg=TEXTCOL,
                                 font=("Courier", 10), state="disabled",
@@ -116,7 +117,7 @@ class PokemonSimulationGUI(tk.Frame):
         # Botón para volver al menú
         btn_frame = tk.Frame(self, bg=BG)
         btn_frame.pack(pady=10)
-        tk.Button(btn_frame, text="🏠  VOLVER AL MENÚ",
+        tk.Button(btn_frame, text="VOLVER AL MENÚ",
                   font=("Courier", 10, "bold"), bg=BLUE_C, fg="#1a1a2e",
                   relief="flat", bd=0, padx=20, pady=8, cursor="hand2",
                   command=self._exit_to_menu).pack()
@@ -238,10 +239,10 @@ class PokemonSimulationGUI(tk.Frame):
         self.blue_hazards = {"stealth_rock": False, "spikes": 0, "toxic_spikes": 0}
         self.red_hazards = {"stealth_rock": False, "spikes": 0, "toxic_spikes": 0}
 
-        lines = ["🎲 ¡Equipos generados aleatoriamente!",
-                f"🔵 Equipo AZUL (IA nivel {self.ai_level}): {', '.join(p.nombre for p in self.blue_team)}",
-                f"🔴 Equipo ROJO (IA nivel {self.ai2_level}): {', '.join(p.nombre for p in self.red_team)}",
-                "── ¡Que comience la batalla! ──"]
+        lines = ["¡Equipos generados aleatoriamente!",
+                f"Equipo AZUL (IA nivel {self.ai_level}): {', '.join(p.nombre for p in self.blue_team)}",
+                f"Equipo ROJO (IA nivel {self.ai2_level}): {', '.join(p.nombre for p in self.red_team)}",
+                "¡Que comience la batalla!"]
         for l in lines:
             self._log(l, "info")
 
@@ -348,11 +349,11 @@ class PokemonSimulationGUI(tk.Frame):
                 return
             line = lines[idx]
             tag = "info"
-            if line.startswith("🔵"):
+            if line.startswith("[AZUL]"):
                 tag = "blue"
-            elif line.startswith("🔴"):
+            elif line.startswith("[ROJO]"):
                 tag = "red"
-            elif any(x in line for x in ["💥","📈","📉","🔥","⚡","❄️","☠️","💊","💚","🎭","🛡"]):
+            elif any(x in line for x in ["[IMPACTO]","[CAMBIO]","[EFECTO]","[DAÑO]","[PARALISIS]","[CONGELACION]","[DERROTA]","[CURACION]","[DEFENSA]","[ESTADO]"]):
                 tag = "effect"
             elif "¡Es muy efectivo" in line:
                 tag = "crit"
@@ -399,7 +400,7 @@ class PokemonSimulationGUI(tk.Frame):
             entrante.mods   = {"atk": 0, "def": 0, "spe": 0, "evasion": 0}
             entrante.protect_success    = True
             entrante.protect_fail_count = 0
-            log_lines.append(f"🔄 ¡{old} regresó! El equipo AZUL envió a {entrante.nombre}")
+            log_lines.append(f"[CAMBIO] {entrante.nombre} fue enviado! El equipo AZUL envió a {entrante.nombre}")
             log_lines += apply_hazards_on_switch(entrante, self.red_hazards, True)
 
         if red_switch:
@@ -410,7 +411,7 @@ class PokemonSimulationGUI(tk.Frame):
             entrante.mods   = {"atk": 0, "def": 0, "spe": 0, "evasion": 0}
             entrante.protect_success    = True
             entrante.protect_fail_count = 0
-            log_lines.append(f"🔄 ¡{old} regresó! El equipo ROJO envió a {entrante.nombre}")
+            log_lines.append(f"[CAMBIO] {entrante.nombre} fue enviado! El equipo ROJO envió a {entrante.nombre}")
             log_lines += apply_hazards_on_switch(entrante, self.blue_hazards, False)
 
         # ── Caso: ambos cambian — finalizar turno ────────────────────────
@@ -514,11 +515,11 @@ class PokemonSimulationGUI(tk.Frame):
                 return
             line = lines[idx]
             tag = "info"
-            if line.startswith("🔵"):
+            if line.startswith("[AZUL]"):
                 tag = "blue"
-            elif line.startswith("🔴"):
+            elif line.startswith("[ROJO]"):
                 tag = "red"
-            elif any(x in line for x in ["💥","📈","📉","🔥","⚡","❄️","☠️","💊","💚","🎭","🛡"]):
+            elif any(x in line for x in ["[IMPACTO]","[CAMBIO]","[EFECTO]","[DAÑO]","[PARALISIS]","[CONGELACION]","[DERROTA]","[CURACION]","[DEFENSA]","[ESTADO]"]):
                 tag = "effect"
             elif "¡Es muy efectivo" in line:
                 tag = "crit"
@@ -594,9 +595,9 @@ class PokemonSimulationGUI(tk.Frame):
         move = atacante.movimientos[move_idx]
         
         if es_azul:
-            log_lines.append(f"🔵 {atacante.nombre} usó {move['nombre']}!")
+            log_lines.append(f"[AZUL] {atacante.nombre} usó {move['nombre']}!")
         else:
-            log_lines.append(f"🔴 {atacante.nombre} usó {move['nombre']}!")
+            log_lines.append(f"[ROJO] {atacante.nombre} usó {move['nombre']}!")
         
         self._log_lines(log_lines)
         log_lines.clear()
@@ -618,7 +619,7 @@ class PokemonSimulationGUI(tk.Frame):
         
         if move["poder"] > 0:
             if hasattr(defensor, 'is_protected') and defensor.is_protected:
-                self._log(f"🛡️ ¡{defensor.nombre} se protegió del ataque de {atacante.nombre}!", "effect")
+                self._log(f"[DEFENSA] {defensor.nombre} se protegió del ataque de {atacante.nombre}!", "effect")
                 defensor.is_protected = False
                 self.root.after(500, callback)
                 return
@@ -627,7 +628,7 @@ class PokemonSimulationGUI(tk.Frame):
             
             if rand(0.0625):
                 damage = int(damage * 1.5)
-                self._log("💥 ¡Golpe crítico!", "crit")
+                self._log("[CRITICO] Golpe crítico!", "crit")
             
             defensor.current_hp = max(0, defensor.current_hp - damage)
             murio = (defensor.current_hp <= 0)
@@ -646,20 +647,20 @@ class PokemonSimulationGUI(tk.Frame):
             elif type_mult < 1:
                 self._log(f"No es muy efectivo... (x{type_mult})", "effect")
             
-            self._log(f"💢 {defensor.nombre} recibió {damage} de daño.", "effect")
+            self._log(f"[IMPACTO] {defensor.nombre} recibió {damage} de daño.", "effect")
             
             if move["nombre"] in ["Gigadrenado", "Puño Drenaje"]:
                 drain = int(damage * 0.5)
                 atacante.heal(drain)
-                self._log(f"💚 {atacante.nombre} absorbió {drain} HP!", "good")
+                self._log(f"[CURACION] {atacante.nombre} absorbió {drain} HP!", "good")
             
             if move["nombre"] == "Pajaro Osado":
                 recoil = int(damage / 3)
                 atacante.apply_damage(recoil, True)
-                self._log(f"⚠️ {atacante.nombre} recibió {recoil} de retroceso!", "effect")
+                self._log(f"[DAÑO] {atacante.nombre} recibió {recoil} de retroceso!", "effect")
             
             if murio:
-                self._log(f"💀 ¡{defensor.nombre} fue derrotado!", "effect")
+                self._log(f"[DERROTA] {defensor.nombre} fue derrotado!", "effect")
                 self._refresh_ui()
             
             apply_move_effects(atacante, defensor, move, effect_msgs, es_azul, self.blue_hazards, self.red_hazards)
@@ -682,31 +683,31 @@ class PokemonSimulationGUI(tk.Frame):
             if pokemon.status == "burn":
                 damage = max(1, int(pokemon.max_hp / 16))
                 pokemon.apply_damage(damage, True)
-                self._log(f"🔥 {pokemon.nombre} sufre daño por quemadura ({damage} HP).", "effect")
+                self._log(f"[QUEMADURA] {pokemon.nombre} sufre daño por quemadura ({damage} HP).", "effect")
             elif pokemon.status == "poison":
                 damage = max(1, int(pokemon.max_hp / 16))
                 pokemon.apply_damage(damage, True)
-                self._log(f"☠️ {pokemon.nombre} sufre daño por veneno ({damage} HP).", "effect")
+                self._log(f"[VENENO] {pokemon.nombre} sufre daño por veneno ({damage} HP).", "effect")
             elif pokemon.status == "toxic":
                 damage = max(1, int(pokemon.max_hp / 16 * pokemon.poison_counter))
                 pokemon.poison_counter += 1
                 pokemon.apply_damage(damage, True)
-                self._log(f"☠️ {pokemon.nombre} sufre daño por veneno grave ({damage} HP).", "effect")
+                self._log(f"[VENENO_GRAVE] {pokemon.nombre} sufre daño por veneno grave ({damage} HP).", "effect")
             elif pokemon.status == "infectado":
                 damage = max(1, int(pokemon.max_hp / 8))
                 pokemon.apply_damage(damage, True)
-                self._log(f"🌱 {pokemon.nombre} pierde {damage} HP por Drenadoras.", "effect")
+                self._log(f"[INFECCION] {pokemon.nombre} pierde {damage} HP por Drenadoras.", "effect")
             if pokemon.current_hp <= 0:
                 pokemon.fainted = True
-                self._log(f"💀 ¡{pokemon.nombre} fue derrotado por el estado!", "effect")
+                self._log(f"[DERROTA] ¡{pokemon.nombre} fue derrotado por el estado!", "effect")
         
         if bp.wish_heal > 0 and not bp.fainted:
             bp.heal(bp.wish_heal)
-            self._log(f"✨ ¡El Deseo se cumple! {bp.nombre} recupera {bp.wish_heal} HP.", "good")
+            self._log(f"[CURACION] El Deseo se cumple! {bp.nombre} recupera {bp.wish_heal} HP.", "good")
             bp.wish_heal = 0
         if rp.wish_heal > 0 and not rp.fainted:
             rp.heal(rp.wish_heal)
-            self._log(f"✨ ¡El Deseo se cumple! {rp.nombre} recupera {rp.wish_heal} HP.", "good")
+            self._log(f"[CURACION] El Deseo se cumple! {rp.nombre} recupera {rp.wish_heal} HP.", "good")
             rp.wish_heal = 0
         
         self._refresh_ui()
@@ -744,7 +745,7 @@ class PokemonSimulationGUI(tk.Frame):
             msgs = apply_hazards_on_switch(new_pokemon, self.red_hazards, True)
             for m in msgs:
                 self._log(m, "effect")
-            self._log(f"🔄 El equipo AZUL envió a {new_pokemon.nombre}!", "blue")
+            self._log(f"[CAMBIO] El equipo AZUL envió a {new_pokemon.nombre}!", "blue")
             self._refresh_ui()
         
         if rp.fainted and red_alive:
@@ -757,13 +758,16 @@ class PokemonSimulationGUI(tk.Frame):
             msgs = apply_hazards_on_switch(new_pokemon, self.blue_hazards, False)
             for m in msgs:
                 self._log(m, "effect")
-            self._log(f"🔄 El equipo ROJO envió a {new_pokemon.nombre}!", "red")
+            self._log(f"[CAMBIO] El equipo ROJO envió a {new_pokemon.nombre}!", "red")
             self._refresh_ui()
 
     def _game_over(self, winner):
         if self._game_over_active:
             return
         self._game_over_active = True
+
+        # Registrar estadisticas de IA
+        registrar_resultado_simulation(winner, self.ai_level, self.ai2_level)
         
         self._refresh_ui()
         
@@ -775,10 +779,10 @@ class PokemonSimulationGUI(tk.Frame):
         win.transient(self.root)
 
         if winner == "blue":
-            msg = "🏆 ¡VICTORIA DEL EQUIPO AZUL! 🏆\nLa IA AZUL ha ganado la batalla."
+            msg = "[VICTORIA] VICTORIA DEL EQUIPO AZUL!\nLa IA AZUL ha ganado la batalla."
             col = BLUE_C
         else:
-            msg = "🏆 ¡VICTORIA DEL EQUIPO ROJO! 🏆\nLa IA ROJA ha ganado la batalla."
+            msg = "[VICTORIA] VICTORIA DEL EQUIPO ROJO!\nLa IA ROJA ha ganado la batalla."
             col = ACCENT
 
         tk.Label(win, text=msg, font=("Courier", 14, "bold"),
@@ -799,12 +803,12 @@ class PokemonSimulationGUI(tk.Frame):
             if self.on_exit_callback:
                 self.root.after(100, self.on_exit_callback)
         
-        tk.Button(frame_botones, text="🔄  JUGAR DE NUEVO",
+        tk.Button(frame_botones, text="JUGAR DE NUEVO",
                   font=("Courier", 10, "bold"), bg=BG3, fg=GOLD,
                   relief="flat", bd=0, padx=14, pady=8, cursor="hand2",
                   command=restart_game).pack(side="left", padx=10)
         
-        tk.Button(frame_botones, text="🏠  MENÚ PRINCIPAL",
+        tk.Button(frame_botones, text="MENÚ PRINCIPAL",
                   font=("Courier", 10, "bold"), bg=BLUE_C, fg="#1a1a2e",
                   relief="flat", bd=0, padx=14, pady=8, cursor="hand2",
                   command=exit_to_menu).pack(side="left", padx=10)
