@@ -27,6 +27,17 @@ class PokemonMenu(tk.Frame):
         self.bg_image_full = None
         self.bg_label = None
         self.current_step = 1
+        self.logo_image = None
+        self.logo_label = None
+        self.recuadro_image = None
+        self.container_image_label = None
+        self.small_logo_image = None
+        self.container_canvas = None
+        self.logo_canvas_img_id = None
+        self.modo_var = tk.StringVar(value=self.modo)
+        self.ai_level_var = tk.IntVar(value=self.ai_level)
+        self.ai2_level_var = tk.IntVar(value=self.ai2_level)
+        self.battle_type_var = tk.IntVar(value=self.battle_type)
         
         self.pack(fill="both", expand=True)
         self._load_full_background()
@@ -83,6 +94,56 @@ class PokemonMenu(tk.Frame):
     
     def _on_window_resize(self, event):
         self._resize_background(event.width, event.height)
+        self._resize_logo_and_recuadro(event.width, event.height)
+        self._redraw_current_step()
+
+    def _redraw_current_step(self):
+        if self.current_step == 1:
+            self._show_mode_selection()
+        elif self.current_step == 2:
+            self._show_level_selection()
+    
+    def _load_logo_and_recuadro(self):
+        """Carga las imágenes del logo y el recuadro"""
+        try:
+            current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            images_dir = os.path.join(current_dir, "images")
+            
+            if not os.path.exists(images_dir):
+                return
+            
+            # Cargar logo
+            logo_path = os.path.join(images_dir, "Logo_Pokefisi.png")
+            if os.path.exists(logo_path):
+                self.logo_original = Image.open(logo_path)
+        except Exception as e:
+            pass
+    
+    def _resize_logo_and_recuadro(self, window_width, window_height):
+        """Redimensiona el logo y el recuadro según el tamaño de la ventana"""
+        try:
+            canvas_width = min(max(int(window_width * 0.62), 520), max(window_width - 40, 520))
+            canvas_height = min(max(int(window_height * 0.75), 560), max(window_height - 40, 520))
+            if self.container_canvas:
+                self.container_canvas.place(relx=0.5, rely=0.47, anchor="center", width=canvas_width, height=canvas_height)
+
+            if hasattr(self, 'logo_original') and self.logo_original:
+                ratio = self.logo_original.width / self.logo_original.height
+                logo_height = min(240, max(180, int(window_height * 0.22)))
+                logo_width = int(logo_height * ratio)
+                logo_resized = self.logo_original.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
+                self.logo_image = ImageTk.PhotoImage(logo_resized)
+
+                small_logo_height = min(180, max(140, int(window_height * 0.16)))
+                small_logo_width = int(small_logo_height * ratio)
+                small_logo_resized = self.logo_original.resize((small_logo_width, small_logo_height), Image.Resampling.LANCZOS)
+                self.small_logo_image = ImageTk.PhotoImage(small_logo_resized)
+
+                if self.container_canvas and self.logo_canvas_img_id is not None:
+                    self.container_canvas.coords(self.logo_canvas_img_id, canvas_width // 2, min(150, canvas_height // 5))
+                    self.container_canvas.itemconfig(self.logo_canvas_img_id, image=self.small_logo_image)
+        except Exception:
+            pass
     
     def _on_start(self):
         #Inicia la batalla con la configuración seleccionada
@@ -107,166 +168,194 @@ class PokemonMenu(tk.Frame):
             self._show_mode_selection()
     
     def _show_mode_selection(self):
-        for widget in self.container.winfo_children():
-            widget.destroy()
+        # Limpiar widgets anteriores
+        for item in self.container_canvas.find_all():
+            if item not in [self.logo_canvas_img_id]:
+                self.container_canvas.delete(item)
 
-        self.container.place(relx=0.5, rely=0.5, anchor="center", width=550, height=550)
-        tk.Label(self.container, text=" POKEFISI ", font=("Courier", 24, "bold"), 
-                bg=PANEL_BG, fg=GOLD).pack(pady=(15, 5))
-        tk.Label(self.container, text="Batallas Pokémon", font=("Courier", 10), 
-                bg=PANEL_BG, fg=TEXTCOL).pack(pady=(0, 15))
-        tk.Frame(self.container, bg=ACCENT, height=2).pack(fill="x", padx=40, pady=5)
-        tk.Frame(self.container, bg=PANEL_BG, height=30).pack()
-        
-        # Selector de modo
-        mode_frame = tk.LabelFrame(self.container, text="MODO DE JUEGO", 
-                                font=("Courier", 11, "bold"),
-                                bg=PANEL_BG, fg=GOLD, padx=30, pady=12)
-        mode_frame.pack(pady=10, padx=30, fill="x")
+        self.container_canvas.update_idletasks()
+        canvas_width = max(self.container_canvas.winfo_width(), 520)
+        canvas_height = max(self.container_canvas.winfo_height(), 520)
+        center_x = canvas_width // 2
 
-        self.modo_var = tk.StringVar(value="pve")
-        
+        y_offset = max(100, int(canvas_height * 0.15))
+
+        if hasattr(self, 'small_logo_image') and self.small_logo_image:
+            if self.logo_canvas_img_id is None:
+                self.logo_canvas_img_id = self.container_canvas.create_image(center_x, y_offset, image=self.small_logo_image, anchor="center")
+            else:
+                self.container_canvas.itemconfig(self.logo_canvas_img_id, image=self.small_logo_image)
+                self.container_canvas.coords(self.logo_canvas_img_id, center_x, y_offset)
+            y_offset += min(120, int(canvas_height * 0.18))
+        else:
+            title_id = self.container_canvas.create_text(center_x, y_offset, text="POKEFISI", font=("Courier", 24, "bold"), fill=GOLD, anchor="center")
+            y_offset += 35
+
+        subtitle_id = self.container_canvas.create_text(center_x, y_offset, text="Selecciona el modo de juego", font=("Courier", 10), fill=TEXTCOL, anchor="center")
+        y_offset += 18
+
+        line_width = min(170, int(canvas_width * 0.35))
+        self.container_canvas.create_line(center_x - line_width, y_offset, center_x + line_width, y_offset, fill=ACCENT, width=2)
+        y_offset += 16
+
+        # Radio buttons para modo
         def on_mode_change():
             self.modo = self.modo_var.get()
 
-        rb1 = tk.Radiobutton(mode_frame, text="Jugador vs IA", variable=self.modo_var,
-                            value="pve", bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
-                            font=("Courier", 10), activebackground=PANEL_BG, 
-                            activeforeground=GOLD, command=on_mode_change)
-        rb1.pack(anchor="w", pady=5)
+        rb1_id = self.container_canvas.create_window(center_x, y_offset, window=tk.Radiobutton(self.container_canvas, text="Jugador vs IA", variable=self.modo_var,
+                            value="pve", bg=BG, fg=TEXTCOL, selectcolor=BG,
+                            font=("Courier", 10), activebackground=BG,
+                            activeforeground=GOLD, command=on_mode_change), anchor="center")
+        y_offset += 28
 
-        rb2 = tk.Radiobutton(mode_frame, text="IA vs IA (Espectador)", variable=self.modo_var,
-                            value="simulation", bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
-                            font=("Courier", 10), activebackground=PANEL_BG,
-                            activeforeground=GOLD, command=on_mode_change)
-        rb2.pack(anchor="w", pady=5)
+        rb2_id = self.container_canvas.create_window(center_x, y_offset, window=tk.Radiobutton(self.container_canvas, text="IA vs IA (Espectador)", variable=self.modo_var,
+                            value="simulation", bg=BG, fg=TEXTCOL, selectcolor=BG,
+                            font=("Courier", 10), activebackground=BG,
+                            activeforeground=GOLD, command=on_mode_change), anchor="center")
+        y_offset += 30
 
-        # Boton estadisticas
-        tk.Button(self.container, text="ESTADÍSTICAS",
+        stats_btn = tk.Button(self.container_canvas, text="ESTADÍSTICAS",
                  font=("Courier", 10, "bold"),
                  bg='#2d5a8e', fg=TEXTCOL, relief="flat", bd=0,
                  padx=20, pady=6, cursor="hand2",
                  activebackground='#3a70aa',
-                 command=self._show_statistics).pack(pady=(8, 0))
-        tk.Frame(self.container, bg=PANEL_BG, height=20).pack()    
-        btn_frame = tk.Frame(self.container, bg=PANEL_BG)
-        btn_frame.pack(pady=10)      
-        tk.Button(btn_frame, text="  SIGUIENTE  ",
+                 command=self._show_statistics)
+        self.container_canvas.create_window(center_x, y_offset, window=stats_btn, anchor="center", width=min(canvas_width - 80, 300))
+        y_offset += 50
+
+        next_btn = tk.Button(self.container_canvas, text="  SIGUIENTE  ",
                  font=("Courier", 12, "bold"),
                  bg=GREEN, fg="#1a1a2e", relief="flat", bd=0,
                  padx=35, pady=8, cursor="hand2",
                  activebackground="#5ee89e",
-                 command=self._next_step).pack()
+                 command=self._next_step)
+        self.container_canvas.create_window(center_x, y_offset, window=next_btn, anchor="center", width=min(canvas_width - 80, 320))
     
     def _show_level_selection(self):
-        for widget in self.container.winfo_children():
-            widget.destroy()
+        # Limpiar widgets anteriores
+        for item in self.container_canvas.find_all():
+            if item not in [self.logo_canvas_img_id]:
+                self.container_canvas.delete(item)
 
-        panel_height = 680 if self.modo == "simulation" else 550
-        self.container.place(relx=0.5, rely=0.5, anchor="center", width=550, height=panel_height)
+        self.container_canvas.update_idletasks()
+        canvas_width = max(self.container_canvas.winfo_width(), 520)
+        canvas_height = max(self.container_canvas.winfo_height(), 520)
+        center_x = canvas_width // 2
 
-        tk.Label(self.container, text=" POKEFISI ", font=("Courier", 24, "bold"), 
-                bg=PANEL_BG, fg=GOLD).pack(pady=(15, 5))
-        tk.Label(self.container, text="Configura la batalla", font=("Courier", 10), 
-                bg=PANEL_BG, fg=TEXTCOL).pack(pady=(0, 15))
-        tk.Frame(self.container, bg=ACCENT, height=2).pack(fill="x", padx=40, pady=5)
-        tk.Frame(self.container, bg=PANEL_BG, height=10).pack()
+        y_offset = max(100, int(canvas_height * 0.15))
 
-        # Selector de nivel IA (Jugador o IA1)
+        # Logo pequeño
+        if hasattr(self, 'small_logo_image') and self.small_logo_image:
+            if self.logo_canvas_img_id is None:
+                self.logo_canvas_img_id = self.container_canvas.create_image(center_x, y_offset, image=self.small_logo_image, anchor="center")
+            else:
+                self.container_canvas.itemconfig(self.logo_canvas_img_id, image=self.small_logo_image)
+                self.container_canvas.coords(self.logo_canvas_img_id, center_x, y_offset)
+            y_offset += 120
+        else:
+            title_id = self.container_canvas.create_text(center_x, y_offset, text="POKEFISI", font=("Courier", 24, "bold"), fill=GOLD, anchor="center")
+            y_offset += 40
+
+        # Subtítulo
+        subtitle_id = self.container_canvas.create_text(center_x, y_offset, text="Configura la batalla", font=("Courier", 10), fill=TEXTCOL, anchor="center")
+        y_offset += 18
+
+        # Línea separadora
+        line_width = min(170, int(canvas_width * 0.35))
+        self.container_canvas.create_line(center_x - line_width, y_offset, center_x + line_width, y_offset, fill=ACCENT, width=2)
+        y_offset += 18
+
+        # Selector de nivel IA
         if self.modo == "pve":
             level_label = "NIVEL DE IA (RIVAL)"
         else:
             level_label = "NIVEL DE IA 1 (AZUL)"
-        
-        level_frame = tk.LabelFrame(self.container, text=level_label, 
-                                    font=("Courier", 11, "bold"),
-                                    bg=PANEL_BG, fg=GOLD, padx=30, pady=12)
-        level_frame.pack(pady=10, padx=30, fill="x")
 
-        self.ai_level_var = tk.IntVar(value=1)
+        level_title_id = self.container_canvas.create_text(center_x, y_offset, text=level_label, font=("Courier", 11, "bold"), fill=GOLD, anchor="center")
+        y_offset += 24
+        if not hasattr(self, 'ai_level_var') or self.ai_level_var is None:
+            self.ai_level_var = tk.IntVar(value=1)
 
-        rb_nivel1 = tk.Radiobutton(level_frame, text="Nivel 1 - Fácil ", 
+        rb_nivel1_id = self.container_canvas.create_window(center_x, y_offset, window=tk.Radiobutton(self.container_canvas, text="Nivel 1 - Fácil ",
                                 variable=self.ai_level_var, value=1,
-                                bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
-                                font=("Courier", 10), activebackground=PANEL_BG,
-                                activeforeground=GOLD)
-        rb_nivel1.pack(anchor="w", pady=5)
+                                bg=BG, fg=TEXTCOL, selectcolor=BG,
+                                font=("Courier", 10), activebackground=BG,
+                                activeforeground=GOLD), anchor="center")
+        y_offset += 24
 
-        rb_nivel2 = tk.Radiobutton(level_frame, text="Nivel 2 - Medio ", 
+        rb_nivel2_id = self.container_canvas.create_window(center_x, y_offset, window=tk.Radiobutton(self.container_canvas, text="Nivel 2 - Medio ",
                                 variable=self.ai_level_var, value=2,
-                                bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
-                                font=("Courier", 10), activebackground=PANEL_BG,
-                                activeforeground=GOLD)
-        rb_nivel2.pack(anchor="w", pady=5)
-        
+                                bg=BG, fg=TEXTCOL, selectcolor=BG,
+                                font=("Courier", 10), activebackground=BG,
+                                activeforeground=GOLD), anchor="center")
+        y_offset += 26
+
         # Selector de nivel IA2 (solo para modo simulación)
         if self.modo == "simulation":
-            tk.Frame(self.container, bg=PANEL_BG, height=10).pack()
-            
-            level2_frame = tk.LabelFrame(self.container, text="NIVEL DE IA 2 (ROJO)", 
-                                        font=("Courier", 11, "bold"),
-                                        bg=PANEL_BG, fg=GOLD, padx=30, pady=12)
-            level2_frame.pack(pady=10, padx=30, fill="x")
-            
+            level2_title_id = self.container_canvas.create_text(center_x, y_offset, text="NIVEL DE IA 2 (ROJO)", font=("Courier", 11, "bold"), fill=GOLD, anchor="center")
+            y_offset += 18
+
             self.ai2_level_var = tk.IntVar(value=1)
-            
-            rb2_nivel1 = tk.Radiobutton(level2_frame, text="Nivel 1 - Fácil ", 
+
+            rb2_nivel1_id = self.container_canvas.create_window(center_x, y_offset, window=tk.Radiobutton(self.container_canvas, text="Nivel 1 - Fácil ",
                                     variable=self.ai2_level_var, value=1,
-                                    bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
-                                    font=("Courier", 10), activebackground=PANEL_BG,
-                                    activeforeground=GOLD)
-            rb2_nivel1.pack(anchor="w", pady=5)
-            
-            rb2_nivel2 = tk.Radiobutton(level2_frame, text="Nivel 2 - Medio ", 
+                                    bg=BG, fg=TEXTCOL, selectcolor=BG,
+                                    font=("Courier", 10), activebackground=BG,
+                                    activeforeground=GOLD), anchor="center")
+            y_offset += 20
+
+            rb2_nivel2_id = self.container_canvas.create_window(center_x, y_offset, window=tk.Radiobutton(self.container_canvas, text="Nivel 2 - Medio ",
                                     variable=self.ai2_level_var, value=2,
-                                    bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
-                                    font=("Courier", 10), activebackground=PANEL_BG,
-                                    activeforeground=GOLD)
-            rb2_nivel2.pack(anchor="w", pady=5)
-        
-        tk.Frame(self.container, bg=PANEL_BG, height=10).pack()
-        
+                                    bg=BG, fg=TEXTCOL, selectcolor=BG,
+                                    font=("Courier", 10), activebackground=BG,
+                                    activeforeground=GOLD), anchor="center")
+            y_offset += 24
+
         # Selector de tipo de combate
-        battle_frame = tk.LabelFrame(self.container, text="TIPO DE COMBATE", 
-                                    font=("Courier", 11, "bold"),
-                                    bg=PANEL_BG, fg=GOLD, padx=30, pady=12)
-        battle_frame.pack(pady=10, padx=30, fill="x")
-        
-        self.battle_type_var = tk.IntVar(value=4)
-        
-        rb_4v4 = tk.Radiobutton(battle_frame, text="4 vs 4 (4 Pokémon por equipo)", 
+        battle_title_id = self.container_canvas.create_text(center_x, y_offset, text="TIPO DE COMBATE", font=("Courier", 11, "bold"), fill=GOLD, anchor="center")
+        y_offset += 18
+
+        if not hasattr(self, 'battle_type_var') or self.battle_type_var is None:
+            self.battle_type_var = tk.IntVar(value=4)
+
+        rb_4v4_id = self.container_canvas.create_window(center_x, y_offset, window=tk.Radiobutton(self.container_canvas, text="4 vs 4 (4 Pokémon por equipo)",
                                variable=self.battle_type_var, value=4,
-                               bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
-                               font=("Courier", 10), activebackground=PANEL_BG,
-                               activeforeground=GOLD)
-        rb_4v4.pack(anchor="w", pady=5)
-        
-        rb_3v3 = tk.Radiobutton(battle_frame, text="3 vs 3 (3 Pokémon por equipo)", 
+                               bg=BG, fg=TEXTCOL, selectcolor=BG,
+                               font=("Courier", 10), activebackground=BG,
+                               activeforeground=GOLD), anchor="center")
+        y_offset += 20
+
+        rb_3v3_id = self.container_canvas.create_window(center_x, y_offset, window=tk.Radiobutton(self.container_canvas, text="3 vs 3 (3 Pokémon por equipo)",
                                variable=self.battle_type_var, value=3,
-                               bg=PANEL_BG, fg=TEXTCOL, selectcolor='#1a1a2e',
-                               font=("Courier", 10), activebackground=PANEL_BG,
-                               activeforeground=GOLD)
-        rb_3v3.pack(anchor="w", pady=5)
-        
-        tk.Frame(self.container, bg=PANEL_BG, height=15).pack()
-        
-        btn_frame = tk.Frame(self.container, bg=PANEL_BG)
-        btn_frame.pack(pady=10)
-        #Botones
-        tk.Button(btn_frame, text="  ATRÁS  ",
+                               bg=BG, fg=TEXTCOL, selectcolor=BG,
+                               font=("Courier", 10), activebackground=BG,
+                               activeforeground=GOLD), anchor="center")
+        y_offset += 30
+
+        buttons_frame = tk.Frame(self.container_canvas, bg=BG)
+        back_btn = tk.Button(buttons_frame, text="  ATRÁS  ",
                  font=("Courier", 11, "bold"),
                  bg='#3a3a4e', fg=TEXTCOL, relief="flat", bd=0,
-                 padx=25, pady=8, cursor="hand2",
+                 padx=20, pady=8, cursor="hand2",
                  activebackground="#4a4a5e",
-                 command=self._back_step).pack(side="left", padx=10)
-        
-        btn_text = "  EMPEZAR BATALLA  " if self.modo == "pve" else "OBSERVAR BATALLA"
-        tk.Button(btn_frame, text=btn_text,
+                 command=self._back_step)
+        start_btn_text = "  EMPEZAR BATALLA  " if self.modo == "pve" else "OBSERVAR BATALLA"
+        start_btn = tk.Button(buttons_frame, text=start_btn_text,
                  font=("Courier", 11, "bold"),
                  bg=GREEN, fg="#1a1a2e", relief="flat", bd=0,
-                 padx=25, pady=8, cursor="hand2",
+                 padx=20, pady=8, cursor="hand2",
                  activebackground="#5ee89e",
-                 command=self._on_start).pack(side="left", padx=10)
+                 command=self._on_start)
+
+        container_width = max(self.container_canvas.winfo_width(), 520)
+        if container_width > 520:
+            back_btn.pack(side="left", padx=10, pady=4)
+            start_btn.pack(side="left", padx=10, pady=4)
+        else:
+            back_btn.pack(fill="x", pady=4)
+            start_btn.pack(fill="x", pady=4)
+
+        self.container_canvas.create_window(center_x, y_offset, window=buttons_frame, anchor="n", width=min(container_width - 60, 420))
     
     def _show_statistics(self):
         #Muestra ventana con estadisticas de las IAs
@@ -355,8 +444,18 @@ class PokemonMenu(tk.Frame):
             if widget != self.bg_label:
                 widget.destroy()
         
-        self.container = tk.Frame(self, bg=PANEL_BG, bd=2, relief="solid",
-                                  highlightbackground=ACCENT, highlightthickness=1)
-        self.container.place(relx=0.5, rely=0.5, anchor="center", width=550, height=550)
+        # Cargar imágenes
+        self._load_logo_and_recuadro()
+        
+        # Crear canvas para el logo y el recuadro transparente
+        self.container_canvas = tk.Canvas(self, highlightthickness=0, bg=BG)
+        self.container_canvas.place(relx=0.5, rely=0.47, anchor="center", width=620, height=700)
+        self.update_idletasks()
+        window_width = self.winfo_width()
+        window_height = self.winfo_height()
+        if window_width < 100:
+            window_width = 1000
+            window_height = 750
+        self._resize_logo_and_recuadro(window_width, window_height)
         
         self._show_mode_selection()
