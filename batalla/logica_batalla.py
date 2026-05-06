@@ -92,21 +92,21 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
                 ai_move_idx = i
                 break
     
-    # Si está volando en turno 1 (carga), no puede atacar
-    if player_pokemon.flying_turns == 1:
+    # Si está volando en turno de carga (2), no puede atacar
+    if player_pokemon.flying_turns == 2:
         player_move_idx = None
-    if ai_pokemon.flying_turns == 1:
+    if ai_pokemon.flying_turns == 2:
         ai_move_idx = None
 
     # Bostezo
     if hasattr(player_pokemon, 'sleep_next') and player_pokemon.sleep_next:
         player_pokemon.status = "sleep"
-        player_pokemon.status_turns = random.randint(2, 5)
+        player_pokemon.status_turns = random.randint(2, 3)
         player_pokemon.sleep_next = False
         log_lines.append(f"😴 ¡{player_pokemon.nombre} se durmió por Bostezo!")
     if hasattr(ai_pokemon, 'sleep_next') and ai_pokemon.sleep_next:
         ai_pokemon.status = "sleep"
-        ai_pokemon.status_turns = random.randint(2, 5)
+        ai_pokemon.status_turns = random.randint(2, 3)
         ai_pokemon.sleep_next = False
         log_lines.append(f"😴 ¡{ai_pokemon.nombre} se durmió por Bostezo!")
 

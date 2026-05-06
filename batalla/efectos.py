@@ -4,9 +4,17 @@ from utiles.funciones_auxiliares import rand, clamp
 def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking, player_hazards, ai_hazards):
     effect = move["efecto"].lower()
     move_name = move["nombre"]
+    
+    # Pokémon volando (Vuelo/Bote turno de carga) es inmune a estados y efectos de campo
+    defender_flying = getattr(defender, 'flying_active', False) and getattr(defender, 'flying_turns', 0) == 2
+    attacker_flying = getattr(attacker, 'flying_active', False) and getattr(attacker, 'flying_turns', 0) == 2
+    
     # 1. Estados
     
     if move_name == "Fuego Fatuo" and defender.status is None:
+        if defender_flying:
+            log_lines.append(f"🕊️ ¡{defender.nombre} está volando y es inmune al estado!")
+            return
         if rand(0.85):
             defender.status = "burn"
             defender.burn_turns = random.randint(2, 5)
@@ -16,6 +24,9 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
         return
     
     if move_name == "Onda Trueno" and defender.status is None:
+        if defender_flying:
+            log_lines.append(f"🕊️ ¡{defender.nombre} está volando y es inmune al estado!")
+            return
         if rand(0.9):
             defender.status = "paralyze"
             defender.paralyze_turns = random.randint(3, 5)
@@ -24,28 +35,34 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
             log_lines.append(f"⚡ La Onda Trueno de {attacker.nombre} falló.")
         return
     
-    if "paralizar" in effect and defender.status is None and rand(0.1):
+    if "paralizar" in effect and defender.status is None and not defender_flying and rand(0.1):
         defender.status = "paralyze"
         defender.paralyze_turns = random.randint(3, 5)
         log_lines.append(f"⚡ ¡{defender.nombre} fue paralizado!")
     
-    if "congelar" in effect and defender.status is None and rand(0.1):
+    if "congelar" in effect and defender.status is None and not defender_flying and rand(0.1):
         defender.status = "freeze"
         defender.freeze_turns = random.randint(2, 5)
         log_lines.append(f"❄️ ¡{defender.nombre} fue congelado!")
     
     if move_name == "Polvo Veneno" and defender.status is None:
+        if defender_flying:
+            log_lines.append(f"🕊️ ¡{defender.nombre} está volando y es inmune al estado!")
+            return
         defender.status = "poison"
         defender.poison_counter = 1
         log_lines.append(f"☠️ ¡{defender.nombre} fue envenenado por Polvo Veneno!")
         return
 
-    if ("envenenar" in effect or effect == "envenena") and defender.status is None and rand(0.3):
+    if ("envenenar" in effect or effect == "envenena") and defender.status is None and not defender_flying and rand(0.3):
         defender.status = "poison"
         defender.poison_counter = 1
         log_lines.append(f"☠️ ¡{defender.nombre} fue envenenado!")
     
     if "veneno grave" in effect and defender.status is None:
+        if defender_flying:
+            log_lines.append(f"🕊️ ¡{defender.nombre} está volando y es inmune al estado!")
+            return
         defender.status = "toxic"
         defender.poison_counter = 1
         log_lines.append(f"☠️ ¡{defender.nombre} fue gravemente envenenado!")
@@ -54,6 +71,9 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
     # 2. Movimientos De Estado
     
     if move_name == "Drenadoras" and defender.status is None and defender.status != "infectado":
+        if defender_flying:
+            log_lines.append(f"🕊️ ¡{defender.nombre} está volando y es inmune a Drenadoras!")
+            return
         defender.status = "infectado"
         defender.leech_seed_from = attacker
         log_lines.append(f"🌱 ¡{defender.nombre} fue infectado por Drenadoras! Perderá HP cada turno.")
@@ -86,15 +106,27 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
         return
     
     if move_name == "Destello" and move["poder"] == 0:
-        attacker.mods["evasion"] = clamp(attacker.mods["evasion"] + 1, -6, 6)
+        defender.mods["evasion"] = clamp(defender.mods["evasion"] + 1, -6, 6)
         evasion_percent = {0: 100, 1: 133, 2: 166, 3: 200, 4: 250, 5: 300, 6: 350}
-        current = evasion_percent.get(attacker.mods["evasion"], 100)
-        log_lines.append(f"✨ ¡La Precisión de {attacker.nombre} aumentó! ({current}%)")
+        current = evasion_percent.get(defender.mods["evasion"], 100)
+        log_lines.append(f"✨ ¡La Precisión de {defender.nombre} bajó! (Evasión rival: {current}%)")
         return
     
     if move_name == "Bostezo" and defender.status is None:
+        if defender_flying:
+            log_lines.append(f"🕊️ ¡{defender.nombre} está volando y es inmune al Bostezo!")
+            return
         defender.sleep_next = True
         log_lines.append(f"😴 ¡{defender.nombre} siente sueño! Se dormirá al siguiente turno.")
+        return
+    
+    if move_name == "Canto" and defender.status is None:
+        if defender_flying:
+            log_lines.append(f"🕊️ ¡{defender.nombre} está volando y es inmune al Canto!")
+            return
+        defender.status = "sleep"
+        defender.status_turns = random.randint(2, 3)
+        log_lines.append(f"🎵 ¡{defender.nombre} fue dormido por el Canto!")
         return
     
     if move_name == "Deseo":
@@ -128,7 +160,7 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
     # Vuelo/Bote: Primer turno (solo carga, sin daño)
     # El PP se consume aquí (turno 1)
     if move_name in ["Vuelo", "Bote"] and attacker.flying_turns == 0 and not getattr(attacker, 'flying_active', False):
-        attacker.flying_turns = 1
+        attacker.flying_turns = 2
         attacker.flying_move = move["nombre"]
         attacker.flying_active = True
         # Consumir PP aquí (turno 1)

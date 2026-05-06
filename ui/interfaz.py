@@ -917,6 +917,10 @@ class PokemonGUI(tk.Frame):
                     )
                     return
             
+            # Si el jugador no tenía movimiento o era None, limpiar pending_switch
+            self.pending_switch = False
+            self.pending_switch_idx = None
+            self.switch_source = None
             self._log_lines(log_lines)
             self._finalizar_turno(log_lines)
             return
@@ -961,12 +965,6 @@ class PokemonGUI(tk.Frame):
             self._log_lines_temp = log_lines.copy()
             
             self._procesar_accion_siguiente(orden, 0)
-            
-            pp = self.player_team[self.player_active_idx]
-            if not is_auto_vuelo and hasattr(pp, 'flying_active') and pp.flying_active and pp.flying_turns == 1:
-                if not self._pending_vuelo:
-                    self._pending_vuelo = True
-                    self.root.after(200, self._auto_vuelo_turn)
 
     def _ejecutar_ataque_con_animacion_y_cambio(self, atacante, defensor, move_idx, es_jugador, log_lines, callback):
         if atacante.fainted:
@@ -1034,6 +1032,31 @@ class PokemonGUI(tk.Frame):
                 self._pokemon_derrotado_en_turno = "ai" if defensor in self.ai_team else "player"
             
             apply_move_effects(atacante, defensor, move, [], es_jugador, self.player_hazards, self.ai_hazards)
+            
+            # Manejar Ida y Vuelta / Voltio Cambio cuando el atacante es el jugador
+            if move["nombre"] in ["Ida y Vuelta", "Voltio Cambio"] and es_jugador and not atacante.fainted:
+                force_idx = getattr(self, 'pending_switch_idx', None)
+                if force_idx is not None:
+                    old_nombre = atacante.nombre
+                    self.player_active_idx = force_idx
+                    new_pokemon = self.player_team[self.player_active_idx]
+                    new_pokemon.mods = {"atk": 0, "def": 0, "spe": 0, "evasion": 0}
+                    new_pokemon.protect_success = True
+                    new_pokemon.protect_fail_count = 0
+                    hazard_msgs_list = []
+                    apply_hazards_on_switch(new_pokemon, self.player_hazards, True)
+                    self._log(f"¡{old_nombre} regresó! ¡{new_pokemon.nombre} entra al campo!", "effect")
+                    self.pending_switch_idx = None
+                    self.pending_switch = False
+                    self.switch_source = None
+                    self.pending_move_idx = None
+                    self._refresh_ui()
+        else:
+            # Movimientos de estado (poder == 0): aplicar efectos igualmente
+            effect_msgs = []
+            apply_move_effects(atacante, defensor, move, effect_msgs, es_jugador, self.player_hazards, self.ai_hazards)
+            for msg in effect_msgs:
+                self._log(msg, "effect")
         
         self.root.after(1200, callback)
 
@@ -1089,6 +1112,15 @@ class PokemonGUI(tk.Frame):
             return
         pp = self.player_team[self.player_active_idx]
         ap = self.ai_team[self.ai_active_idx]
+        
+        # Procesar Bostezo pendiente (sleep_next)
+        for pokemon in [pp, ap]:
+            if not pokemon.fainted and getattr(pokemon, 'sleep_next', False):
+                pokemon.status = "sleep"
+                pokemon.status_turns = random.randint(2, 3)
+                pokemon.sleep_next = False
+                self._log(f"😴 ¡{pokemon.nombre} se durmió por Bostezo!", "effect")
+        
         for pokemon in [pp, ap]:
             if pokemon.fainted:
                 continue
@@ -1134,6 +1166,17 @@ class PokemonGUI(tk.Frame):
             pp.is_protected = False
         if hasattr(ap, 'is_protected'):
             ap.is_protected = False
+        
+        # Decrementar flying_turns al final del turno (2=cargando, 1=listo para atacar)
+        for pokemon in [pp, ap]:
+            if hasattr(pokemon, 'flying_turns') and pokemon.flying_turns == 2:
+                pokemon.flying_turns = 1
+        
+        # Disparar auto-vuelo si el jugador acaba de terminar su turno de carga
+        if hasattr(pp, 'flying_active') and pp.flying_active and pp.flying_turns == 1:
+            if not getattr(self, '_pending_vuelo', False):
+                self._pending_vuelo = True
+                self.root.after(300, self._auto_vuelo_turn)
         
         self._refresh_ui()
 
@@ -1262,6 +1305,10 @@ class PokemonGUI(tk.Frame):
         self.turn += 1
         self._log_lines(log_lines)
         self._aplicar_efectos_fin_turno()
+        # Limpiar estado de cambio pendiente al finalizar el turno
+        self.pending_switch = False
+        self.pending_switch_idx = None
+        self.switch_source = None
         self._refresh_ui()
         self._verificar_derrotados_y_preguntar()
 
@@ -1269,6 +1316,13 @@ class PokemonGUI(tk.Frame):
         if self._procesando_derrotado:
             return
         self._procesando_derrotado = True
+        
+        # Limpiar estado de cambio pendiente (Ida y Vuelta / Voltio Cambio) si quedó atascado
+        pp_check = self.player_team[self.player_active_idx]
+        if pp_check.fainted and self.pending_switch:
+            self.pending_switch = False
+            self.pending_switch_idx = None
+            self.switch_source = None
         
         for p in self.player_team:
             if p.current_hp <= 0 and not p.fainted:
