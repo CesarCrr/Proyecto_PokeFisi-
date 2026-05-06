@@ -15,7 +15,7 @@ class BattlePokemon:
         self.spe_base = data["spe"]
         
         # Calcular estadísticas reales según nivel 55
-        self.max_hp = self._calcular_estadistica(self.hp_base)
+        self.max_hp = self._calcular_hp(self.hp_base)
         self.current_hp = self.max_hp
         self.atk = self._calcular_estadistica(self.atk_base)
         self.defensa = self._calcular_estadistica(self.def_base)
@@ -79,23 +79,16 @@ class BattlePokemon:
         self.leech_seed_from = None
 
     def _calcular_estadistica(self, base):
-        #Calcula la estadística real según nivel 55
-        #  Fórmula estándar de Pokémon: ((2 * base + IV + EV/4) * nivel / 100) + 5
-        # Usamos IV=31 (máximo) y EV=0 para simplificar
-        
-        iv = 31  # Individual Values (máximo)
-        ev = 0   # Effort Values (sin entrenamiento)
+        # Fórmula simplificada para stats normales (Atk, Def, Spe):
+        # ((2 * Base * Nivel) / 100) + 5
         nivel = self.level
-        return int(((2 * base + iv + (ev // 4)) * nivel / 100) + 5)
+        return int(((2 * base * nivel) / 100) + 5)
     
     def _calcular_hp(self, base):
-        #Calcula el HP real según nivel 55
-        #  Fórmula de HP: ((2 * base + IV + EV/4) * nivel / 100) + nivel + 10
-   
-        iv = 31
-        ev = 0
+        # Fórmula simplificada para HP:
+        # ((2 * Base * Nivel) / 100) + Nivel + 10
         nivel = self.level
-        return int(((2 * base + iv + (ev // 4)) * nivel / 100) + nivel + 10)
+        return int(((2 * base * nivel) / 100) + nivel + 10)
 
     def get_effective_stat(self, stat):
         from utiles.funciones_auxiliares import get_stat_stage_mod, get_evasion_mod
