@@ -6,6 +6,8 @@ STATS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file
 STATS_DEFAULTS = {
     "ia1": {"victorias": 0, "derrotas": 0},
     "ia2": {"victorias": 0, "derrotas": 0},
+    "ia3": {"victorias": 0, "derrotas": 0},
+    "ia4": {"victorias": 0, "derrotas": 0},
 }
 
 def _cargar():

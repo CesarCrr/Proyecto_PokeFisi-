@@ -106,12 +106,26 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
         return
     
     if move_name == "Destello" and move["poder"] == 0:
+        # Destello sube la evasión del defensor, lo que reduce la precisión del atacante rival.
+        # La evasión del defensor se usa en el chequeo de precisión de logica_batalla.
         defender.mods["evasion"] = clamp(defender.mods["evasion"] + 1, -6, 6)
-        evasion_percent = {0: 100, 1: 133, 2: 166, 3: 200, 4: 250, 5: 300, 6: 350}
-        current = evasion_percent.get(defender.mods["evasion"], 100)
-        log_lines.append(f"✨ ¡La Precisión de {defender.nombre} bajó! (Evasión rival: {current}%)")
+        stage = defender.mods["evasion"]
+        # Mostrar reducción de precisión equivalente para el ATACANTE
+        # stage +1 → precisión rival ≈ 75%, +2 → 60%, +3 → 50%, etc.
+        prec_table = {0: 100, 1: 75, 2: 60, 3: 50, 4: 40, 5: 33, 6: 29}
+        prec_pct = prec_table.get(stage, 100)
+        log_lines.append(f"✨ ¡Destello cegó a {defender.nombre}! Su precisión bajó al ~{prec_pct}%.")
         return
     
+    if move_name == "Hipnosis" and defender.status is None:
+        if defender_flying:
+            log_lines.append(f"🕊️ ¡{defender.nombre} está volando y es inmune a Hipnosis!")
+            return
+        defender.status = "sleep"
+        defender.status_turns = random.randint(2, 3)
+        log_lines.append(f"😴 ¡{defender.nombre} quedó dormido por Hipnosis! ({defender.status_turns} turnos)")
+        return
+
     if move_name == "Bostezo" and defender.status is None:
         if defender_flying:
             log_lines.append(f"🕊️ ¡{defender.nombre} está volando y es inmune al Bostezo!")
@@ -126,7 +140,7 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
             return
         defender.status = "sleep"
         defender.status_turns = random.randint(2, 3)
-        log_lines.append(f"🎵 ¡{defender.nombre} fue dormido por el Canto!")
+        log_lines.append(f"🎵 ¡{defender.nombre} quedó dormido por el Canto! ({defender.status_turns} turnos)")
         return
     
     if move_name == "Deseo":
@@ -187,7 +201,10 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
             attacker.outrage_active = True
             attacker.outrage_turns = random.randint(2, 3)
             attacker.outrage_locked = True
-            log_lines.append(f"😤 ¡{attacker.nombre} se enfureció por {attacker.outrage_turns} turnos! Solo podrá usar Enfado y no podrá cambiar.")
+            log_lines.append(f"😤 ¡{attacker.nombre} está enfurecido! (Quedan {attacker.outrage_turns} turnos)")
+        elif attacker.outrage_active:
+            # Ya activo - este es el mensaje de turno continuo
+            pass  # el mensaje lo pone logica_batalla al decrementar
         return
     
     # 3. Peligros

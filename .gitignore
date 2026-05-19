@@ -1,0 +1,5 @@
+# Cache de GIFs procesados
+cache/
+*.pickle
+__pycache__/
+*.pyc
