@@ -92,7 +92,6 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
                 ai_move_idx = i
                 break
     
-    # Si está volando en turno de carga (2), no puede atacar
     if player_pokemon.flying_turns == 2:
         player_move_idx = None
     if ai_pokemon.flying_turns == 2:
@@ -110,11 +109,6 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
         ai_pokemon.sleep_next = False
         log_lines.append(f"😴 ¡{ai_pokemon.nombre} se durmió por Bostezo!")
 
-    # Vuelo/Bote — turno 2 (aterrizaje y golpe)
-    # El turno de carga (flying_turns==2) solo prepara el vuelo; el rival SÍ actúa.
-    # El turno de golpe  (flying_turns==1) se resuelve aquí antes del bucle de velocidad,
-    # y el pokemon que aterriza no vuelve a actuar en el bucle normal (move_idx=None).
-    # Durante el turno de carga el pokemon es invulnerable (excepto a Eléctrico).
     def _ejecutar_aterrizaje(atacante, defensor, log):
         move_name = atacante.flying_move
         move = next((m for m in atacante.movimientos if m["nombre"] == move_name), None)
@@ -156,38 +150,34 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
 
     if player_pokemon.flying_turns == 1:
         _ejecutar_aterrizaje(player_pokemon, ai_pokemon, log_lines)
-        player_move_idx = None   # no actúa de nuevo en el bucle normal
+        player_move_idx = None
 
     if ai_pokemon.flying_turns == 1:
         _ejecutar_aterrizaje(ai_pokemon, player_pokemon, log_lines)
-        ai_move_idx = None       # no actúa de nuevo en el bucle normal
+        ai_move_idx = None
 
-    # Enfado
+    # Enfado — forzar movimiento si está activo
     if player_pokemon.outrage_active:
-        player_pokemon.outrage_turns -= 1
-        if player_pokemon.outrage_turns <= 0:
-            player_pokemon.outrage_active = False
-            player_pokemon.outrage_locked = False
-            player_pokemon.confused = True
-            player_pokemon.confused_turns = random.randint(2, 5)
-            log_lines.append(f"😵 ¡{player_pokemon.nombre} ya no está enfurecido! ¡{player_pokemon.nombre} está confundido!")
-        else:
-            enfado_idx = next((i for i, m in enumerate(player_pokemon.movimientos) if m["nombre"] == "Enfado"), player_move_idx)
-            player_move_idx = enfado_idx
-            log_lines.append(f"😤 {player_pokemon.nombre} está enfurecido! (Quedan {player_pokemon.outrage_turns} turnos)")
+        enfado_idx = next((i for i, m in enumerate(player_pokemon.movimientos) if m["nombre"] == "Enfado"), player_move_idx)
+        player_move_idx = enfado_idx
+        log_lines.append(f"😤 {player_pokemon.nombre} está enfurecido! (Quedan {player_pokemon.outrage_turns} turnos)")
 
     if ai_pokemon.outrage_active:
-        ai_pokemon.outrage_turns -= 1
-        if ai_pokemon.outrage_turns <= 0:
-            ai_pokemon.outrage_active = False
-            ai_pokemon.outrage_locked = False
-            ai_pokemon.confused = True
-            ai_pokemon.confused_turns = random.randint(2, 5)
-            log_lines.append(f"😵 ¡{ai_pokemon.nombre} ya no está enfurecido! ¡{ai_pokemon.nombre} está confundido!")
-        else:
-            enfado_idx = next((i for i, m in enumerate(ai_pokemon.movimientos) if m["nombre"] == "Enfado"), ai_move_idx)
-            ai_move_idx = enfado_idx
-            log_lines.append(f"😤 {ai_pokemon.nombre} está enfurecido! (Quedan {ai_pokemon.outrage_turns} turnos)")
+        enfado_idx = next((i for i, m in enumerate(ai_pokemon.movimientos) if m["nombre"] == "Enfado"), ai_move_idx)
+        ai_move_idx = enfado_idx
+        log_lines.append(f"😤 {ai_pokemon.nombre} está enfurecido! (Quedan {ai_pokemon.outrage_turns} turnos)")
+
+    # Decrementar Enfado al final del turno (después de atacar)
+    for pokemon in [player_pokemon, ai_pokemon]:
+        if not getattr(pokemon, 'outrage_active', False):
+            continue
+        pokemon.outrage_turns -= 1
+        if pokemon.outrage_turns <= 0:
+            pokemon.outrage_active = False
+            pokemon.outrage_locked = False
+            pokemon.confused = True
+            pokemon.confused_turns = random.randint(2, 5)
+            log_lines.append(f"😵 ¡{pokemon.nombre} ya no está enfurecido! ¡{pokemon.nombre} está confundido!")
 
     def check_confusion(pokemon, log):
         if pokemon.confused:
@@ -288,13 +278,11 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
             
             move = player_pokemon.movimientos[player_move_idx]
             
-            # Vuelo/Bote: primer turno de carga (solo sube, sin daño)
-            # El rival SÍ actúa este turno; el jugador queda invulnerable.
             if move["nombre"] in ["Vuelo", "Bote"]:
                 if player_pokemon.flying_turns == 0 and not player_pokemon.flying_active:
                     log_lines.append(f"🔵 {player_pokemon.nombre} usó {move['nombre']}!")
                     apply_move_effects(player_pokemon, ai_pokemon, move, log_lines, True, player_hazards, ai_hazards)
-                    continue  # El jugador no hace más este turno; la IA sí actúa
+                    continue
             
             # Log del movimiento
             log_lines.append(f"🔵 {player_pokemon.nombre} usó {move['nombre']}!")
@@ -304,11 +292,9 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
                 log_lines.append("¡Sin PP! El movimiento falló.")
                 continue
             
-            # Consumir PP (solo si no es Vuelo/Bote, ya retornamos antes para esos)
             if move["nombre"] not in ["Vuelo", "Bote"]:
                 move["pp"] -= 1
             
-            # Verificar si el objetivo puede ser golpeado
             if not can_be_hit(player_pokemon, ai_pokemon, move):
                 log_lines.append(f"🕊️ ¡{ai_pokemon.nombre} está volando y {player_pokemon.nombre} no puede alcanzarlo!")
                 continue
@@ -391,12 +377,11 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
             
             move = ai_pokemon.movimientos[ai_move_idx]
             
-            # Vuelo/Bote para IA: primer turno de carga (solo sube, sin daño)
             if move["nombre"] in ["Vuelo", "Bote"]:
                 if ai_pokemon.flying_turns == 0 and not ai_pokemon.flying_active:
                     log_lines.append(f"🔴 {ai_pokemon.nombre} usó {move['nombre']}!")
                     apply_move_effects(ai_pokemon, player_pokemon, move, log_lines, False, player_hazards, ai_hazards)
-                    continue  # La IA no hace más este turno; el jugador sí actúa
+                    continue
             
             log_lines.append(f"🔴 {ai_pokemon.nombre} usó {move['nombre']}!")
             
@@ -456,7 +441,6 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
                 player_pokemon.fainted = True
                 log_lines.append(f"💀 ¡{player_pokemon.nombre} fue derrotado!")
 
-    # Daño por estado al final del turno
     for pokemon in [player_pokemon, ai_pokemon]:
         if pokemon.fainted:
             continue

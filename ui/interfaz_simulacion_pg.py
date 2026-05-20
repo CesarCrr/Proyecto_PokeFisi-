@@ -26,7 +26,6 @@ _IMGS     = os.path.join(_BASE_DIR, "images")
 SEL_COL  = (30, 80, 200)
 NORM_COL = PKM_BLACK
 
-
 class PokemonSimulationGUI:
     STATE_RUNNING   = "running"
     STATE_GAME_OVER = "game_over"
@@ -101,7 +100,6 @@ class PokemonSimulationGUI:
         self.icon_muerto = load_image_pil(muerto_path, (12,12), keep_alpha=True)
 
         self._poke_gifs = {}
-
 
     def _get_poke_gif(self, nombre, size=None):
         if size is None:
@@ -182,7 +180,6 @@ class PokemonSimulationGUI:
         ]
         self._go_btns = []
 
-    # ── Inicio ───────────────────────────────────────────────────────────
     def _start_new_game(self):
         pool = POKEMON_DB[:]
         random.shuffle(pool)
@@ -231,7 +228,6 @@ class PokemonSimulationGUI:
         self._turn_pending   = True
         self._last_turn_time = pygame.time.get_ticks()
 
-    # ── Log helpers ──────────────────────────────────────────────────────
     def _log_msg(self, msg, color=None):
         self.log.add(msg, color or PKM_BLACK)
 
@@ -262,7 +258,6 @@ class PokemonSimulationGUI:
             if "baja" in line or "[CURACION]" in line:
                 self._trigger_hp_anim()
 
-    # ── Event handling ───────────────────────────────────────────────────
     def handle_event(self, event):
         if event.type == pygame.VIDEORESIZE:
             self.W, self.H = event.w, event.h
@@ -285,7 +280,6 @@ class PokemonSimulationGUI:
         elif tag == "restart":
             self._start_new_game()
 
-    # ── Turno IA ─────────────────────────────────────────────────────────
     def _start_turn(self):
         if self._game_over_active: return
         # Sincronizar blue_ia con estado actual
@@ -296,7 +290,6 @@ class PokemonSimulationGUI:
         if hasattr(self.blue_ia, "enemy_active_idx"):
             self.blue_ia.enemy_active_idx = self.red_active_idx
         blue_action = self.blue_ia.get_action()
-        # Re-sincronizar red_ia después del get_action() de blue
         self.red_ia.active_idx  = self.red_active_idx
         self.red_ia.enemy       = self.blue_team[self.blue_active_idx]
         if hasattr(self.red_ia, "enemy_team"):
@@ -537,7 +530,6 @@ class PokemonSimulationGUI:
         self._hp_anim["blue"]["tgt"]=max(0,bp.current_hp/bp.max_hp)
         self._hp_anim["red"]["tgt"] =max(0,rp.current_hp/rp.max_hp)
 
-    # ── Update / Draw ────────────────────────────────────────────────────
     def update(self):
         self._tick_log_lines()
         for key in ("blue","red"):

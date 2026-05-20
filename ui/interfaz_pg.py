@@ -42,6 +42,7 @@ CUADRO_H = 290
 class PokemonGUI:
     STATE_MOVE_SEL_INIT = "move_sel_init"
     STATE_MOVE_SELECT   = "move_select"
+    STATE_CONTINUE      = "continue"
     STATE_SWITCH_SELECT = "switch_select"
     STATE_WAITING       = "waiting"
     STATE_GAME_OVER     = "game_over"
@@ -76,6 +77,7 @@ class PokemonGUI:
         self._ai_move_idx      = None
         self._player_force_idx = None
         self._log_lines_temp   = []
+        self._continue_callback = None
 
         self._pending_log_lines = []
         self._log_delay_ms      = LOG_DELAY_MS
@@ -126,9 +128,7 @@ class PokemonGUI:
         self.icon_vivo   = load_image_pil(vivo_path,   (12, 12), keep_alpha=True)
         self.icon_muerto = load_image_pil(muerto_path, (12, 12), keep_alpha=True)
 
-        # Cache local para GIFs (se llenará bajo demanda)
         self._poke_gifs = {}
-
 
     def _get_poke_gif(self, nombre, size=None):
         """Obtiene un GIF precargado, redimensionado si es necesario."""
@@ -228,9 +228,6 @@ class PokemonGUI:
         self.log = TextLog(self.rect_action, pkm_font(12), fg=PKM_BLACK)
         self.log.line_h = pkm_font(12).get_height() + 7
 
-
-
-    # ── Inicio / Setup ───────────────────────────────────────────────────
     def _start_new_game(self):
         pool = POKEMON_DB[:]
         random.shuffle(pool)
@@ -316,7 +313,6 @@ class PokemonGUI:
             "Iniciar" if last else "Siguiente", f, tag="siguiente",
             text_align="left"))
 
-    # ── Event handling ───────────────────────────────────────────────────
     def handle_event(self, event):
         # Redimensión de ventana
         if event.type == pygame.VIDEORESIZE:
@@ -330,6 +326,17 @@ class PokemonGUI:
             return
 
         self.log.handle_scroll(event)
+
+        if self.state == self.STATE_CONTINUE:
+            if (event.type == pygame.MOUSEBUTTONDOWN or
+                    (event.type == pygame.KEYDOWN and
+                     event.key in (pygame.K_RETURN, pygame.K_SPACE))):
+                cb = self._continue_callback
+                self._continue_callback = None
+                self.state = self.STATE_WAITING
+                if cb: cb()
+            return
+
         mouse = pygame.mouse.get_pos()
 
         if self.state == self.STATE_MOVE_SEL_INIT:
@@ -389,7 +396,6 @@ class PokemonGUI:
                 if btn.handle_event(event):
                     self._dialog["callback"](btn.tag)
 
-    # ── Selección de movimientos ─────────────────────────────────────────
     def _toggle_move(self, i):
         sel = [j for j,v in enumerate(self._move_vars) if v]
         if self._move_vars[i]:
@@ -454,7 +460,6 @@ class PokemonGUI:
         self.state = self.STATE_MOVE_SELECT
         self._refresh_ui()
 
-    # ── Log helpers ──────────────────────────────────────────────────────
     def _log_msg(self, msg, color=None):
         color = color or PKM_BLACK
         self.log.add(msg, color)
@@ -466,12 +471,11 @@ class PokemonGUI:
         self.buttons_locked     = True
 
     def _tick_log_lines(self):
-        # Si hay un diálogo abierto (cambio forzado, pregunta), no avanzar el log
-        # para evitar que callbacks del turno anterior se disparen fuera de orden
         if self._dialog or self._ventana_cambio_abierta:
             return
+        if self.state == self.STATE_CONTINUE:
+            return
 
-        # Si hay una animación HP en curso, esperar a que termine antes de avanzar
         for a in self._hp_anim.values():
             if a["animating"]:
                 return
@@ -497,11 +501,9 @@ class PokemonGUI:
             self._log_msg(line, col)
             self._last_log_time = now
 
-            # Disparar animación HP al mostrar línea de daño/curación
             if ("[IMPACTO]" in line or "[DANO]" in line or
                     "[CURACION]" in line or "baja" in line):
                 self._trigger_hp_anim_from_state()
-            # Al cambiar de Pokémon: sincronizar barra al instante con el nuevo HP
             if "[CAMBIO]" in line:
                 self._sync_hp_on_switch()
 
@@ -513,10 +515,9 @@ class PokemonGUI:
         ap = self.ai_team[self.ai_active_idx]
         p_pct = max(0.0, pp.current_hp / pp.max_hp)
         a_pct = max(0.0, ap.current_hp / ap.max_hp)
-        # Salto instantáneo (sin animación) para el Pokémon que entró
         for key, pct in (("player", p_pct), ("ai", a_pct)):
             a = self._hp_anim[key]
-            a["cur"]       = pct   # salta directo
+            a["cur"]       = pct  # salta directo
             a["tgt"]       = pct
             a["animating"] = False
 
@@ -533,9 +534,8 @@ class PokemonGUI:
             a = self._hp_anim[key]
             if abs(pct - a["cur"]) > 0.005:
                 a["tgt"]       = pct
-                a["animating"] = True   # bloquea el log hasta terminar
+                a["animating"] = True  # bloquea el log hasta terminar
 
-    # ── Diálogos modales (dentro del cuadro inferior) ────────────────────
     def _show_dialog_in_cuadro(self, title, options):
         """
         Muestra un diálogo de selección dentro del cuadro inferior.
@@ -589,7 +589,6 @@ class PokemonGUI:
                 [(yes_lbl, "yes"), (no_lbl, "no")])
         self._dialog["callback"] = callback
 
-    # ── Acciones del jugador ─────────────────────────────────────────────
     def _on_move(self, move_idx):
         if self.buttons_locked or self.pending_switch: return
         pp = self.player_team[self.player_active_idx]
@@ -618,7 +617,6 @@ class PokemonGUI:
         self._execute_turn(("switch", target_idx))
         self.active_tab = "moves"
 
-    # ── Ejecución de turno (misma lógica que antes) ───────────────────────
     def _execute_turn(self, player_action):
         self.ia.active_idx = self.ai_active_idx
         self.ia.enemy = self.player_team[self.player_active_idx]
@@ -645,7 +643,6 @@ class PokemonGUI:
             if entrante.fainted:
                 log_lines.append(f"💀 ¡{entrante.nombre} fue derrotado por las trampas al entrar!")
                 self._log_lines_delayed(log_lines, self._refresh_ui); return
-            # La IA ataca al Pokémon entrante (mecánica estándar de cambio voluntario)
             ai_flying_carga = (getattr(self.ai_team[self.ai_active_idx], 'flying_active', False) and
                                getattr(self.ai_team[self.ai_active_idx], 'flying_turns', 0) == 2)
             if ai_action[0]=="move" and ai_action[1] is not None and not ai_flying_carga:
@@ -677,7 +674,7 @@ class PokemonGUI:
                 self._log_lines_delayed(log_lines, lambda: self._finalizar_turno([]))
             return
 
-        pmv = player_action[1] if player_action[0]=="move" else None
+        pmv = player_action[1] if (player_action[0]=="move" and player_action[1] != -1) else None
         amv = ai_action[1]     if ai_action[0]=="move"     else None
         pfi = self.pending_switch_idx
 
@@ -701,7 +698,6 @@ class PokemonGUI:
             self._log_lines_delayed(self._log_lines_temp,
                                     self._aplicar_efectos_fin_turno_y_verificar)
             return
-        # Al inicio del turno (primer acción), decrementar flying_turns
         if index == 0:
             pp = self.player_team[self.player_active_idx]
             ap = self.ai_team[self.ai_active_idx]
@@ -731,7 +727,6 @@ class PokemonGUI:
                     for i, m in enumerate(p.movimientos):
                         if m["nombre"] == flying_mv:
                             pmv = i; break
-            # Turno 1 de carga (flying_turns==2): el jugador no actúa
             if getattr(p, 'flying_active', False) and getattr(p, 'flying_turns', 0) == 2:
                 pmv = None
             if pmv is not None:
@@ -755,7 +750,6 @@ class PokemonGUI:
                     for i, m in enumerate(p.movimientos):
                         if m["nombre"] == flying_mv:
                             amv = i; break
-            # Turno 1 de carga (flying_turns==2): la IA no actúa
             if getattr(p, 'flying_active', False) and getattr(p, 'flying_turns', 0) == 2:
                 amv = None
             if amv is not None:
@@ -766,9 +760,7 @@ class PokemonGUI:
 
     def _ejecutar_ataque_seq(self, atacante, defensor, move_idx, force_idx,
                               es_jugador, log_lines, callback):
-        # Verificar que ambos estén vivos antes de atacar
         if atacante.fainted or atacante.current_hp <= 0:
-            # Si el atacante murió y tenía un pending_switch (Voltio Cambio/Ida y Vuelta), limpiarlo
             if es_jugador and self.pending_switch:
                 self.pending_switch = False
                 self.pending_switch_idx = None
@@ -776,7 +768,6 @@ class PokemonGUI:
             callback(); return
         if defensor.fainted or defensor.current_hp <= 0: callback(); return
 
-        # ── Verificar estado del atacante ─────────────────────────────────
         if atacante.status == "sleep":
             atacante.status_turns -= 1
             if atacante.status_turns <= 0:
@@ -807,7 +798,6 @@ class PokemonGUI:
                 log_lines.append(f"⚡ {atacante.nombre} está paralizado y no puede moverse!")
                 self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
 
-        # ── Verificar confusión ───────────────────────────────────────────
         if getattr(atacante, 'confused', False):
             atacante.confused_turns -= 1
             if atacante.confused_turns <= 0:
@@ -828,8 +818,6 @@ class PokemonGUI:
         if move["pp"] <= 0:
             log_lines.append("¡Sin PP! El movimiento falló.")
             self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
-        # Inmunidad por Vuelo/Bote — el defensor está en turno de carga
-        # flying_turns==1 significa que acabó de decrementarse y está volando este turno
         MOVES_HIT_FLYING = {"Trueno", "Onda Trueno", "Vendaval", "Tormenta"}
         if (getattr(defensor, 'flying_active', False) and
                 getattr(defensor, 'flying_turns', 0) == 1 and
@@ -837,7 +825,6 @@ class PokemonGUI:
             log_lines.append(f"🕊️ ¡No afecta a {defensor.nombre}! (está volando)")
             self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
         if move["nombre"] not in ["Vuelo","Bote"]: move["pp"] -= 1
-        # Precisión (saltar para movimientos que siempre aciertan)
         SKIP_ACC = {"Proteccion","Vuelo","Bote","Ida y Vuelta","Voltio Cambio","Onda Trueno",
                     "Fuego Fatuo","Deseo","Danza Espada","Malicioso","Mofa","Doble Equipo",
                     "Defensa Ferréa","Foco Energía","Agilidad","Impulso","Danza Aleteo",
@@ -869,12 +856,11 @@ class PokemonGUI:
             if move["nombre"]=="Pajaro Osado":
                 r=int(damage/3); atacante.apply_damage(r,True); log_lines.append(f"[DANO] {atacante.nombre} recibe {r} de retroceso.")
             if murio:
-                defensor.fainted = True   # marcar inmediatamente para que no ataque
+                defensor.fainted = True
                 log_lines.append(f"[DERROTA] {defensor.nombre} fue derrotado!")
             apply_move_effects(atacante,defensor,move,effect_msgs,es_jugador,self.player_hazards,self.ai_hazards)
             log_lines += effect_msgs
             if force_idx is not None and es_jugador:
-                # Ida y Vuelta / Voltio Cambio: siempre regresar y enviar el nuevo
                 new_p = self.player_team[force_idx]
                 old_name = atacante.nombre
                 self.player_active_idx = force_idx
@@ -896,7 +882,6 @@ class PokemonGUI:
         self.turn += 1
         def go():
             self.pending_switch=False; self.pending_switch_idx=None; self.switch_source=None
-            # Resetear protect_fail_count si el pokemon NO usó Protección este turno
             pp = self.player_team[self.player_active_idx]
             ap = self.ai_team[self.ai_active_idx]
             pmv = getattr(self, '_player_move_idx', None)
@@ -919,6 +904,17 @@ class PokemonGUI:
         if not self.player_team or not self.ai_team: return
         pp = self.player_team[self.player_active_idx]
         ap = self.ai_team[self.ai_active_idx]
+        # Decrementar Enfado al final del turno
+        for pokemon in [pp, ap]:
+            if not getattr(pokemon, 'outrage_active', False):
+                continue
+            pokemon.outrage_turns -= 1
+            if pokemon.outrage_turns <= 0:
+                pokemon.outrage_active = False
+                pokemon.outrage_locked = False
+                pokemon.confused = True
+                pokemon.confused_turns = random.randint(2, 5)
+                self._log_msg(f"😵 ¡{pokemon.nombre} ya no está enfurecido! ¡{pokemon.nombre} está confundido!", (140,0,180))
         for pokemon in [pp, ap]:
             if pokemon.fainted: continue
             if pokemon.status=="burn":
@@ -944,7 +940,7 @@ class PokemonGUI:
         if hasattr(pp,'is_protected'): pp.is_protected=False
         if hasattr(ap,'is_protected'): ap.is_protected=False
         self._refresh_ui()
-        self._trigger_hp_anim_from_state()  # actualizar barra tras efectos de fin de turno
+        self._trigger_hp_anim_from_state()
         self._verificar_derrotados()
 
     def _verificar_derrotados(self):
@@ -968,8 +964,6 @@ class PokemonGUI:
             nuevo_idx = random.choice(aa)
             self._pokemon_ia_pendiente = (nuevo_idx, self.ai_team[nuevo_idx])
             self._procesando_derrotado=False
-            # Si el jugador está en Enfado (outrage_locked) o volando,
-            # no puede cambiar — solo se envía el pokemon de la IA y continúa
             pp_outrage = getattr(pp, 'outrage_locked', False)
             pp_flying  = getattr(pp, 'flying_active', False)
             if not pp.fainted and not self._ventana_cambio_abierta and not pp_outrage and not pp_flying:
@@ -977,16 +971,45 @@ class PokemonGUI:
             else:
                 self._enviar_ia_pendiente()
             return
-        self.buttons_locked=False
-        self.state=self.STATE_MOVE_SELECT
-        self._refresh_ui()
         self._procesando_derrotado=False
+        self._iniciar_siguiente_turno()
+
+    def _iniciar_siguiente_turno(self):
+        """Decide si el siguiente turno es automático (Enfado/Vuelo) o espera al jugador."""
+        pp = self.player_team[self.player_active_idx]
+        ap = self.ai_team[self.ai_active_idx]
+        outrage = getattr(pp, 'outrage_locked', False)
+        flying  = getattr(pp, 'flying_active', False) and getattr(pp, 'flying_turns', 0) > 0
+
+        if outrage or flying:
+            # Turno automático: mostrar "Continuar" antes de ejecutar
+            label = "😤 sigue enfurecido" if outrage else "🕊️ sigue volando"
+            self._show_continue(
+                f"{pp.nombre} {label}... (Presiona Continuar)",
+                lambda: self._execute_turn(("move", -1))  # -1 = forzado por outrage/vuelo
+            )
+        else:
+            # Turno normal: mostrar botón Continuar y luego dar control al jugador
+            self._show_continue(
+                "Presiona Continuar para el siguiente turno.",
+                self._unlock_player
+            )
+
+    def _unlock_player(self):
+        self.buttons_locked = False
+        self.state = self.STATE_MOVE_SELECT
+        self._refresh_ui()
+
+    def _show_continue(self, mensaje, callback):
+        self._log_msg(f"── {mensaje} ──", (100, 100, 100))
+        self._continue_callback = callback
+        self.buttons_locked = True
+        self.state = self.STATE_CONTINUE
+        self._refresh_ui()
 
     def _force_switch_player(self):
         if self._ventana_cambio_abierta: return
         self._ventana_cambio_abierta=True
-        # Limpiar cualquier log/callback pendiente del turno anterior
-        # para que no vuelvan a bloquear los botones tras el cambio
         self._pending_log_lines = []
         self._log_callback = None
         avail = [i for i,p in enumerate(self.player_team) if not p.fainted]
@@ -1003,10 +1026,8 @@ class PokemonGUI:
             p.mods={"atk":0,"def":0,"spe":0,"evasion":0}
             p.protect_success=True; p.protect_fail_count=0
             self._log_msg(f"[CAMBIO] 🔄 {p.nombre} al campo!", PKM_BLUE)
-            # Limpiar de nuevo por si el log_msg disparó algo
             self._pending_log_lines = []
             self._log_callback = None
-            # Turno termina aquí: ambos eligen de nuevo el próximo turno
             self.buttons_locked = False
             self.state = self.STATE_MOVE_SELECT
             self._refresh_ui()
@@ -1056,10 +1077,8 @@ class PokemonGUI:
         # Limpiar callbacks pendientes del turno anterior
         self._pending_log_lines = []
         self._log_callback = None
-        self.buttons_locked=False
-        self.state=self.STATE_MOVE_SELECT
-        self._refresh_ui()
         self._procesando_derrotado=False
+        self._iniciar_siguiente_turno()
 
     def _game_over(self, winner):
         if self._game_over_active: return
@@ -1094,17 +1113,14 @@ class PokemonGUI:
         self.ai_hazards    ={"stealth_rock":False,"spikes":0,"toxic_spikes":0}
         self._start_new_game()
 
-    # ── Refresco UI ──────────────────────────────────────────────────────
     def _refresh_ui(self):
         if not self.player_team or not self.ai_team: return
         pp = self.player_team[self.player_active_idx]
         ap = self.ai_team[self.ai_active_idx]
-        # Sincronizar cur con el HP real al inicio/cambio de pokémon
         p_pct = max(0.0, pp.current_hp / pp.max_hp)
         a_pct = max(0.0, ap.current_hp / ap.max_hp)
         for key, pct in (("player", p_pct), ("ai", a_pct)):
             a = self._hp_anim[key]
-            # Solo sincronizar si NO está animando (p.ej. al inicio o cambio)
             if not a["animating"] and abs(pct - a["tgt"]) < 0.001:
                 a["cur"] = pct
                 a["tgt"] = pct
@@ -1133,7 +1149,6 @@ class PokemonGUI:
             btn.text=f"{star}{p.nombre}  {faint}"
             btn.disabled=dis
 
-    # ── Update / Draw ────────────────────────────────────────────────────
     def update(self):
         self._tick_log_lines()
         for key in ("player","ai"):
@@ -1141,10 +1156,10 @@ class PokemonGUI:
             if a["animating"]:
                 diff = a["tgt"] - a["cur"]
                 if abs(diff) > 0.003:
-                    a["cur"] += diff * a["speed"]   # suave e interpolado
+                    a["cur"] += diff * a["speed"]  # suave e interpolado
                 else:
                     a["cur"]       = a["tgt"]
-                    a["animating"] = False           # desbloquear log
+                    a["animating"] = False  # desbloquear log
 
     def draw(self):
         # 1. Fondo
@@ -1157,10 +1172,8 @@ class PokemonGUI:
             self._draw_move_selection_full()
             return
 
-        # 2. Fondo_Vida (top)
         self._draw_vida_panels()
 
-        # 3. Sprites (mid)
         self._draw_sprites()
 
         # 4. Cuadro inferior
@@ -1177,13 +1190,11 @@ class PokemonGUI:
         """Dibuja la selección de movimientos con un cuadro alto (casi toda la pantalla)."""
         W, H = self.W, self.H
         margin = 5
-        # Cuadro grande: desde margen superior hasta margen inferior
         sel_w = W - 10
         sel_h = H - margin * 2 - 10
         sel_x = margin
         sel_y = margin + 5
         sel_rect = pygame.Rect(sel_x, sel_y, sel_w, sel_h)
-        # Cargar/escalar cuadro_stats al tamaño del panel de selección
         sel_surf = load_image_pil(
             os.path.join(_IMGS, "Cuadro_Texto", "Cuadro_stats.png"),
             (sel_w, sel_h), keep_alpha=True)
@@ -1230,16 +1241,14 @@ class PokemonGUI:
 
         # Escalar fuentes al tamaño del panel
         panel_w  = rect.width
-        # Fuentes compactas para el panel de vida pequeño
-        f_owner  = pkm_font(max(6, int(panel_w * 0.022)))   # "Jugador" / "IA NvX"
-        f_name   = pkm_font(max(7, int(panel_w * 0.026)))   # nombre Pokémon
-        f_hp     = pkm_font(max(6, int(panel_w * 0.022)))   # "HP:xxx/xxx"
-        f_status = pkm_font(max(5, int(panel_w * 0.019)))   # tag estado
+        f_owner  = pkm_font(max(6, int(panel_w * 0.022)))  # "Jugador" / "IA NvX"
+        f_name   = pkm_font(max(7, int(panel_w * 0.026)))  # nombre Pokémon
+        f_hp     = pkm_font(max(6, int(panel_w * 0.022)))  # "HP:xxx/xxx"
+        f_status = pkm_font(max(5, int(panel_w * 0.019)))  # tag estado
 
         x  = inner.x + 4
         y  = inner.y + 2
 
-        # 1. Nombre del jugador/IA (encima del nombre del Pokémon)
         draw_text(self.screen, label, x, y, f_owner, SEL_COL)
         y += f_owner.get_height() + 0
 
@@ -1247,7 +1256,6 @@ class PokemonGUI:
         draw_text(self.screen, f"{poke.nombre} N{poke.level}", x, y, f_name, PKM_BLACK)
         y += f_name.get_height() + 1
 
-        # 3. Status + HP en la misma línea
         x_hp = x
         if poke.status:
             sc  = STATUS_COLORS.get(poke.status, (136,136,136))
@@ -1258,7 +1266,6 @@ class PokemonGUI:
             self.screen.blit(ss, (x+3, y+1))
             x_hp = sr.right + 4
 
-        # Mostrar HP interpolado (sincronizado con la barra animada)
         hp_display = int(round(hp_cur * poke.max_hp))
         hp_display = max(0, min(hp_display, poke.max_hp))
         draw_text(self.screen, f"HP:{hp_display}/{poke.max_hp}", x_hp, y, f_hp, PKM_BLACK)
@@ -1333,10 +1340,15 @@ class PokemonGUI:
                              (self.rect_tab_switch.x, self.rect_tab_switch.bottom-1),
                              (self.rect_tab_switch.right, self.rect_tab_switch.bottom-1), 2)
 
-        # Si hay log reciente mostrarlo, si no — botones
-        if self.state == self.STATE_WAITING:
-            # Mostrar log
+        if self.state in (self.STATE_WAITING, self.STATE_CONTINUE):
             self.log.draw(self.screen)
+            if self.state == self.STATE_CONTINUE:
+                f_cont = pkm_font(14)
+                txt = f_cont.render("[ Clic / Enter / Espacio para continuar ]", True, (60,60,180))
+                r = txt.get_rect(midbottom=(self.W//2, self.H - 8))
+                pygame.draw.rect(self.screen, (220,220,240), r.inflate(12,6), border_radius=4)
+                pygame.draw.rect(self.screen, (60,60,180), r.inflate(12,6), 2, border_radius=4)
+                self.screen.blit(txt, r)
         else:
             # Dibujar botones de acción
             btns = self.move_buttons if self.active_tab=="moves" else self.switch_buttons
@@ -1353,7 +1365,6 @@ class PokemonGUI:
                                  (btn.rect.right, btn.rect.bottom), 1)
             # Log debajo si hay líneas
             if self.log.lines:
-                # Mostrar últimas 2 líneas bajo los botones como preview
                 pass
 
     def _draw_dialog_in_cuadro(self):

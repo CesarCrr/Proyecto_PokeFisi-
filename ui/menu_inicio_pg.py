@@ -1,4 +1,5 @@
 import pygame
+from ui.audio_manager import play_menu
 import os
 
 from ui.pygame_utils import (
@@ -35,6 +36,7 @@ class PokemonMenu:
 
         self._load_assets()
         self._recalc_layout()
+        play_menu()
         self._build_step_mode()
 
     # ── Assets ────────────────────────────────────────────────────────────
@@ -387,4 +389,3 @@ class PokemonMenu:
                       inner.centerx,
                       inner.y + inner.height - max(28,int(inner.height*0.10))*2 - 30,
                       f_conf, PKM_RED, center=True)
-

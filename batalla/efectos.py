@@ -5,7 +5,6 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
     effect = move["efecto"].lower()
     move_name = move["nombre"]
     
-    # Pokémon volando (Vuelo/Bote turno de carga) es inmune a estados y efectos de campo
     defender_flying = getattr(defender, 'flying_active', False) and getattr(defender, 'flying_turns', 0) == 2
     attacker_flying = getattr(attacker, 'flying_active', False) and getattr(attacker, 'flying_turns', 0) == 2
     
@@ -106,12 +105,8 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
         return
     
     if move_name == "Destello" and move["poder"] == 0:
-        # Destello sube la evasión del defensor, lo que reduce la precisión del atacante rival.
-        # La evasión del defensor se usa en el chequeo de precisión de logica_batalla.
         defender.mods["evasion"] = clamp(defender.mods["evasion"] + 1, -6, 6)
         stage = defender.mods["evasion"]
-        # Mostrar reducción de precisión equivalente para el ATACANTE
-        # stage +1 → precisión rival ≈ 75%, +2 → 60%, +3 → 50%, etc.
         prec_table = {0: 100, 1: 75, 2: 60, 3: 50, 4: 40, 5: 33, 6: 29}
         prec_pct = prec_table.get(stage, 100)
         log_lines.append(f"✨ ¡Destello cegó a {defender.nombre}! Su precisión bajó al ~{prec_pct}%.")
@@ -171,13 +166,10 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
             attacker.is_protected = False
         return
     
-    # Vuelo/Bote: Primer turno (solo carga, sin daño)
-    # El PP se consume aquí (turno 1)
     if move_name in ["Vuelo", "Bote"] and attacker.flying_turns == 0 and not getattr(attacker, 'flying_active', False):
         attacker.flying_turns = 2
         attacker.flying_move = move["nombre"]
         attacker.flying_active = True
-        # Consumir PP aquí (turno 1)
         if move["pp"] > 0:
             move["pp"] -= 1
         log_lines.append(f"🕊️ {attacker.nombre} comenzó a volar (turno 1). Atacará automáticamente el próximo turno.")
@@ -203,8 +195,7 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
             attacker.outrage_locked = True
             log_lines.append(f"😤 ¡{attacker.nombre} está enfurecido! (Quedan {attacker.outrage_turns} turnos)")
         elif attacker.outrage_active:
-            # Ya activo - este es el mensaje de turno continuo
-            pass  # el mensaje lo pone logica_batalla al decrementar
+            pass
         return
     
     # 3. Peligros
@@ -220,12 +211,10 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
     
     if move_name == "Puas":
         if is_player_attacking:
-            # El jugador ataca, coloca púas en el campo de la IA (rival)
             if ai_hazards["spikes"] < 3:
                 ai_hazards["spikes"] += 1
                 log_lines.append(f"📌 ¡{attacker.nombre} colocó una capa de púas en el campo rival! (Nivel {ai_hazards['spikes']}/3)")
         else:
-            # La IA ataca, coloca púas en el campo del jugador
             if player_hazards["spikes"] < 3:
                 player_hazards["spikes"] += 1
                 log_lines.append(f"📌 ¡{attacker.nombre} colocó una capa de púas en tu campo! (Nivel {player_hazards['spikes']}/3)")
