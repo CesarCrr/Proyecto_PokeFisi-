@@ -1,5 +1,19 @@
 import pygame
 import random
+
+def rand(prob):
+    return random.random() < prob
+
+def clamp(value, min_val, max_val):
+    return max(min_val, min(max_val, value))
+
+def get_stat_stage_mod(stage):
+    stages = [0.25,0.28,0.33,0.4,0.5,0.66,1,1.5,2,2.5,3,3.5,4]
+    return stages[max(0, min(12, stage + 6))]
+
+def get_evasion_mod(stage):
+    stages = [0.33,0.38,0.43,0.5,0.6,0.75,1,1.33,1.66,2,2.5,3,3.5]
+    return stages[max(0, min(12, stage + 6))]
 import os
 
 from datos.datos_pokemon import POKEMON_DB
@@ -16,7 +30,6 @@ from models.clase_batalla import BattlePokemon
 from batalla.logica_batalla import calculate_damage, get_priority
 from batalla.peligros import apply_hazards_on_switch
 from batalla.efectos import apply_move_effects
-from utiles.funciones_auxiliares import rand
 from ia.ia_levels import RandomAI, HeuristicAI, MinimaxAI
 from utiles.estadisticas import registrar_resultado_simulation
 
@@ -80,24 +93,31 @@ class PokemonSimulationGUI:
         bg_path = os.path.join(_IMGS, "Fondos", "Fondo_Batalla.jfif")
         self.bg_surf = load_bg_image(bg_path, (W, H))
 
-        vida_w = (W - 20) // 2
-        vida_h = int(vida_w / (2573/905))
+        VIDA_RATIO = 2573/905
+        vida_w = int(W * 0.34)
+        vida_h = int(vida_w / VIDA_RATIO * 0.65)
         self.vida_w = vida_w
         self.vida_h = vida_h
         vida_path = os.path.join(_IMGS, "Cuadro_Texto", "Fondo_Vida.png")
         self.vida_surf = load_image_pil(vida_path, (vida_w, vida_h), keep_alpha=True)
 
+        f_ref    = pkm_font(12)
+        line_h   = f_ref.get_height() + 7
+        borde_v  = max(10, int(H * 0.018))
         cuadro_w = W - 10
-        cuadro_h = int(cuadro_w / (2843/2135))
+        cuadro_h = line_h * 3 + borde_v * 2 + 40
+        cuadro_h = max(120, min(cuadro_h, int(H * 0.26)))
         self.cuadro_w = cuadro_w
         self.cuadro_h = cuadro_h
         cuadro_path = os.path.join(_IMGS, "Cuadro_Texto", "Cuadro_stats.png")
         self.cuadro_surf = load_image_pil(cuadro_path, (cuadro_w, cuadro_h), keep_alpha=True)
 
+        icon_sz = max(10, int(W * 0.013))
         vivo_path   = os.path.join(_IMGS, "Vivo_Poke.png")
         muerto_path = os.path.join(_IMGS, "Muerto_Poke.png")
-        self.icon_vivo   = load_image_pil(vivo_path,   (12,12), keep_alpha=True)
-        self.icon_muerto = load_image_pil(muerto_path, (12,12), keep_alpha=True)
+        self.icon_vivo   = load_image_pil(vivo_path,   (icon_sz, icon_sz), keep_alpha=True)
+        self.icon_muerto = load_image_pil(muerto_path, (icon_sz, icon_sz), keep_alpha=True)
+        self._icon_sz    = icon_sz
 
         self._poke_gifs = {}
 
@@ -119,48 +139,40 @@ class PokemonSimulationGUI:
         W, H = self.W, self.H
         margin = 5
 
-        vida_w = int(W * 0.44)
-        vida_h = int(vida_w / (2573/905))
-        self.vida_w = vida_w
-        self.vida_h = vida_h
-        vida_path = os.path.join(_IMGS, "Cuadro_Texto", "Fondo_Vida.png")
-        self.vida_surf = load_image_pil(vida_path, (vida_w, vida_h), keep_alpha=True)
-
+        vida_w = self.vida_w
+        vida_h = self.vida_h
         vida_y = margin
         self.rect_vida_blue = pygame.Rect(margin, vida_y, vida_w, vida_h)
         self.rect_vida_red  = pygame.Rect(W - vida_w - margin, vida_y, vida_w, vida_h)
-        vida_bottom = vida_y + vida_h + 4
+        dot_gap     = max(10, int(vida_w * 0.055)) + 6
+        vida_bottom = vida_y + vida_h + dot_gap + 4
 
-        cuadro_w = W - 10
-        cuadro_h = max(240, int(H * 0.38))
+        cuadro_w  = self.cuadro_w
+        cuadro_h  = self.cuadro_h
         cuadro_top = H - cuadro_h - margin
-        cuadro_path = os.path.join(_IMGS, "Cuadro_Texto", "Cuadro_stats.png")
-        self.cuadro_surf = load_image_pil(cuadro_path, (cuadro_w, cuadro_h), keep_alpha=True)
-        self.cuadro_w = cuadro_w
-        self.cuadro_h = cuadro_h
-        self.cuadro_y = cuadro_top
+        self.cuadro_y   = cuadro_top
         self.rect_cuadro = pygame.Rect(margin, cuadro_top, cuadro_w, cuadro_h)
 
-        sprite_zone_h = cuadro_top - vida_bottom - 4
+        sprite_zone_h = max(80, cuadro_top - vida_bottom - 2)
         self.sprite_h = sprite_zone_h
         self.rect_sprite_zone = pygame.Rect(0, vida_bottom, W, sprite_zone_h)
-        sp_size = min(sprite_zone_h - 8, (W // 2) - 16)
+        sp_size = min(sprite_zone_h - 4, W // 2 - 12)
         self.rect_sprite_blue = pygame.Rect(W//4 - sp_size//2, vida_bottom+(sprite_zone_h-sp_size)//2, sp_size, sp_size)
         self.rect_sprite_red  = pygame.Rect(W*3//4 - sp_size//2, vida_bottom+(sprite_zone_h-sp_size)//2, sp_size, sp_size)
 
-        borde   = max(10, int(self.cuadro_w * 0.036))
-        borde_v = max(12, int(self.cuadro_h * 0.045))
+        borde   = max(8, int(cuadro_w * 0.025))
+        borde_v = max(8, int(cuadro_h * 0.06))
         self.cuadro_inner = pygame.Rect(
             self.rect_cuadro.x + borde,
             self.rect_cuadro.y + borde_v,
-            self.cuadro_w - borde*2,
-            self.cuadro_h - borde_v*2
+            cuadro_w - borde*2,
+            cuadro_h - borde_v*2
         )
 
         def vida_inner(rect):
-            xi = rect.x + int(rect.width  * 0.12)
+            xi = rect.x + int(rect.width  * 0.14)
             yi = rect.y + int(rect.height * 0.10)
-            wi = int(rect.width  * 0.86)
+            wi = int(rect.width  * 0.72)
             hi = int(rect.height * 0.82)
             return pygame.Rect(xi, yi, wi, hi)
 
@@ -559,22 +571,47 @@ class PokemonSimulationGUI:
         bp=self.blue_team[self.blue_active_idx]; rp=self.red_team[self.red_active_idx]
         self._draw_one_vida(self.rect_vida_blue,self.vida_inner_blue,
                             bp,self.blue_team,self.blue_active_idx,
-                            f"IA Nivel {self.ai_level}",self._hp_anim["blue"]["cur"],PKM_BLUE)
+                            f"IA Nivel {self.ai_level}",self._hp_anim["blue"]["cur"],PKM_BLUE, flip=True)
         self._draw_one_vida(self.rect_vida_red,self.vida_inner_red,
                             rp,self.red_team,self.red_active_idx,
-                            f"IA Nivel {self.ai2_level}",self._hp_anim["red"]["cur"],PKM_RED)
+                            f"IA Nivel {self.ai2_level}",self._hp_anim["red"]["cur"],PKM_RED, flip=False)
+        # Iconos debajo de cada cuadro
+        dot_size = max(10, int(self.vida_w * 0.055))
+        gap      = max(2, int(dot_size * 0.35))
+        for team, rect, active_idx in [
+            (self.blue_team, self.rect_vida_blue, self.blue_active_idx),
+            (self.red_team,  self.rect_vida_red,  self.red_active_idx)
+        ]:
+            total_w = len(team) * dot_size + (len(team)-1) * gap
+            sx = rect.x + (rect.width - total_w) // 2
+            sy = rect.bottom + 3
+            for i, p in enumerate(team):
+                cx = sx + i*(dot_size+gap) + dot_size//2
+                cy = sy + dot_size//2
+                icon = self.icon_muerto if p.fainted else self.icon_vivo
+                if icon:
+                    si = pygame.transform.smoothscale(icon, (dot_size, dot_size))
+                    self.screen.blit(si, (cx-dot_size//2, cy-dot_size//2))
+                else:
+                    color  = (68,68,68) if p.fainted else HP_GREEN_PKM
+                    border = (180,120,0) if i==active_idx else PKM_BLACK
+                    pygame.draw.circle(self.screen, color,  (cx,cy), dot_size//2)
+                    pygame.draw.circle(self.screen, border, (cx,cy), dot_size//2, 2)
 
-    def _draw_one_vida(self, rect, inner, poke, team, active_idx, label, hp_cur, name_col):
-        if self.vida_surf: self.screen.blit(self.vida_surf, rect.topleft)
+    def _draw_one_vida(self, rect, inner, poke, team, active_idx, label, hp_cur, name_col, flip=False):
+        if self.vida_surf:
+            surf = pygame.transform.flip(self.vida_surf, True, False) if flip else self.vida_surf
+            self.screen.blit(surf, rect.topleft)
         else:
             pygame.draw.rect(self.screen,(255,255,255),rect)
             pygame.draw.rect(self.screen,PKM_BLACK,rect,2)
 
-        panel_w  = rect.width
-        f_owner  = pkm_font(max(6, int(panel_w * 0.022)))
-        f_name   = pkm_font(max(7, int(panel_w * 0.026)))
-        f_hp     = pkm_font(max(6, int(panel_w * 0.022)))
-        f_status = pkm_font(max(5, int(panel_w * 0.019)))
+        elem_h   = max(1, inner.height // 4)
+        base_sz  = max(6, min(elem_h - 2, 13))
+        f_owner  = pkm_font(base_sz)
+        f_name   = pkm_font(base_sz)
+        f_hp     = pkm_font(base_sz)
+        f_status = pkm_font(max(5, base_sz - 1))
 
         x = inner.x + 4
         y = inner.y + 2
@@ -603,38 +640,31 @@ class PokemonSimulationGUI:
         bar_w = inner.width - 8
         bar_h = max(6, int(inner.height * 0.12))
         draw_hp_bar(self.screen, pygame.Rect(x,y,bar_w,bar_h), hp_cur, dark_bg=False)
-        y += bar_h + 3
-
-        dot_size = max(8, int(panel_w * 0.019))
-        for i, p in enumerate(team):
-            cx = x + i*(dot_size+3) + dot_size//2
-            cy = y + dot_size//2
-            icon = self.icon_muerto if p.fainted else self.icon_vivo
-            if icon:
-                scaled_icon = pygame.transform.scale(icon, (dot_size, dot_size))
-                self.screen.blit(scaled_icon, (cx-dot_size//2, cy-dot_size//2))
-            else:
-                color  = (68,68,68) if p.fainted else HP_GREEN_PKM
-                border = (180,120,0) if i==active_idx else PKM_BLACK
-                pygame.draw.circle(self.screen, color,  (cx,cy), dot_size//2)
-                pygame.draw.circle(self.screen, border, (cx,cy), dot_size//2, 2)
+        # Iconos dibujados en _draw_vida_panels debajo del cuadro
 
     def _draw_sprites(self):
         if not self.blue_team or not self.red_team: return
         bp = self.blue_team[self.blue_active_idx]
         rp = self.red_team[self.red_active_idx]
         
-        for poke, rect in [(bp, self.rect_sprite_blue), (rp, self.rect_sprite_red)]:
+        for poke, rect, do_flip in [
+            (bp, self.rect_sprite_blue, True),
+            (rp, self.rect_sprite_red,  False)
+        ]:
             gif = self._get_poke_gif(poke.nombre)
             img = gif.get_frame() if gif and gif.is_valid() else None
             if img:
                 iw, ih = img.get_size()
                 scale = min(rect.width / iw, rect.height / ih)
                 nw, nh = int(iw * scale), int(ih * scale)
-                scaled = pygame.transform.smoothscale(img, (nw, nh))
+                if img.get_flags() & pygame.SRCALPHA:
+                    scaled = pygame.transform.smoothscale(img, (nw, nh))
+                else:
+                    scaled = pygame.transform.smoothscale(img.convert_alpha(), (nw, nh))
+                if do_flip:
+                    scaled = pygame.transform.flip(scaled, True, False)
                 ix = rect.x + (rect.width - nw) // 2
                 iy = rect.y + (rect.height - nh) // 2
-                
                 if poke.fainted:
                     grey = pygame.Surface((nw, nh), pygame.SRCALPHA)
                     grey.fill((100, 100, 100, 180))

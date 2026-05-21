@@ -1,4 +1,19 @@
-from utiles.funciones_auxiliares import clamp, get_stat_stage_mod
+import random
+
+def rand(prob):
+    return random.random() < prob
+
+def clamp(value, min_val, max_val):
+    return max(min_val, min(max_val, value))
+
+def get_stat_stage_mod(stage):
+    stages = [0.25,0.28,0.33,0.4,0.5,0.66,1,1.5,2,2.5,3,3.5,4]
+    return stages[max(0, min(12, stage + 6))]
+
+def get_evasion_mod(stage):
+    stages = [0.33,0.38,0.43,0.5,0.6,0.75,1,1.33,1.66,2,2.5,3,3.5]
+    return stages[max(0, min(12, stage + 6))]
+
 
 class BattlePokemon:
     def __init__(self, data, preassigned_moves=None, level=55):
@@ -29,7 +44,7 @@ class BattlePokemon:
                     move["pp_max"] = move.get("ppMax", move.get("pp_max", 0))
                 self.movimientos.append(move)
         else:
-            import random
+
             movs_originales = data["movimientos"][:]
             random.shuffle(movs_originales)
             for m in movs_originales[:4]:
@@ -91,7 +106,6 @@ class BattlePokemon:
         return int(((2 * base * nivel) / 100) + nivel + 10)
 
     def get_effective_stat(self, stat):
-        from utiles.funciones_auxiliares import get_stat_stage_mod, get_evasion_mod
         if stat == "evasion":
             return get_evasion_mod(self.mods["evasion"])
         

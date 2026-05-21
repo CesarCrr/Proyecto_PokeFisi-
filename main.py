@@ -86,19 +86,20 @@ class PokemonApp:
         else:
             self.screen = pygame.display.set_mode(
                 (BASE_W, BASE_H), pygame.RESIZABLE)
-        # Notificar a la escena del cambio de superficie
+        pygame.display.flip()  # forzar que pygame actualice el tamaño real
+        W, H = self.screen.get_size()  # leer tamaño real DESPUÉS del flip
         if self.current_scene:
             self.current_scene.screen = self.screen
-            W, H = self.screen.get_size()
             self.current_scene.W = W
             self.current_scene.H = H
             if hasattr(self.current_scene, '_recalc_layout'):
                 self.current_scene._recalc_layout()
             if hasattr(self.current_scene, '_rebuild_current_step'):
                 self.current_scene._rebuild_current_step()
+            if hasattr(self.current_scene, '_load_assets'):
+                self.current_scene._load_assets()
             if hasattr(self.current_scene, '_compute_layout'):
                 self.current_scene._compute_layout()
-                # Refrescar botones de batalla
                 if hasattr(self.current_scene, '_refresh_ui'):
                     self.current_scene._refresh_ui()
 
