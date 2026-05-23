@@ -216,26 +216,21 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
             pokemon.status_turns -= 1
             if pokemon.status_turns <= 0:
                 pokemon.status = None
-                log.append(f"😴 ¡{pokemon.nombre} se despertó!")
-            else:
-                log.append(f"😴 {pokemon.nombre} no puede atacar porque está dormido!")
-                return False
+                log.append(f"😴 ¡{pokemon.nombre} se despertó! No puede atacar este turno.")
+            return False  # no ataca el turno que se despierta ni mientras duerme
         if pokemon.status == "freeze":
             if hasattr(pokemon, 'freeze_turns'):
                 pokemon.freeze_turns -= 1
                 if pokemon.freeze_turns <= 0:
                     pokemon.status = None
-                    log.append(f"❄️ ¡{pokemon.nombre} se descongeló!")
-                    return True
+                    log.append(f"❄️ ¡{pokemon.nombre} se descongeló! No puede atacar este turno.")
                 else:
                     log.append(f"❄️ {pokemon.nombre} no puede atacar porque está congelado!")
-                    return False
+                return False  # no ataca el turno que se descongela
             if rand(0.2):
                 pokemon.status = None
-                log.append(f"❄️ ¡{pokemon.nombre} se descongeló!")
-            else:
-                log.append(f"❄️ {pokemon.nombre} no puede atacar porque está congelado!")
-                return False
+                log.append(f"❄️ ¡{pokemon.nombre} se descongeló! No puede atacar este turno.")
+            return False  # no ataca el turno que se descongela ni mientras está congelado
         if pokemon.status == "paralyze":
             if hasattr(pokemon, 'paralyze_turns'):
                 pokemon.paralyze_turns -= 1

@@ -142,7 +142,7 @@ class PokemonMenu:
         # IA 1
         quarter = (inner.width - 32) // 4
         for k, (tag, label) in enumerate([("ai1_1","Nivel 1"), ("ai1_2","Nivel 2"),
-                                          ("ai1_3","Nivel 3")]):
+                                          ("ai1_3","Nivel 3"), ("ai1_4","Nivel 4")]):
             xi = lx + k * (quarter + 2)
             self.buttons.append(Button(pygame.Rect(xi, y, quarter - 2, line_h),
                                        label, f, tag=tag, text_align="left"))
@@ -340,7 +340,7 @@ class PokemonMenu:
         draw_text(self.screen, "Configure la batalla",
                   inner.centerx, inner.y + 8, f_title, PKM_BLACK, center=True)
 
-        _nv_map = {1:"Nivel 1",2:"Nivel 2",3:"Nivel 3 (MM)",4:"Nivel 4 (MM x10)"}
+        _nv_map = {1:"Nivel 1",2:"Nivel 2",3:"Nivel 3 (MM)",4:"Nivel 4 (GA)"}
         lbl_ia1 = (f"IA 1: {_nv_map.get(self.ai_level,'')}"
                    if is_sim else
                    f"Nivel de IA: {_nv_map.get(self.ai_level,'')}")

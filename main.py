@@ -1,6 +1,3 @@
-# main.py — Punto de entrada PokeFisi (Pygame)
-# Ventana redimensionable con soporte de pantalla completa (F11 o doble clic en barra)
-
 import os
 import sys
 
@@ -9,24 +6,21 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pygame
 from ui.menu_inicio_pg         import PokemonMenu
 from ui.interfaz_pg            import PokemonGUI
+from ia.minimax_ai             import MinimaxAI4
 from ui.audio_manager          import play_menu, play_battle, stop
 from ui.interfaz_simulacion_pg import PokemonSimulationGUI
 from ui.pygame_utils           import preload_all_resources
-
 
 BASE_W = 900
 BASE_H = 660
 FPS    = 60
 TITLE  = "PokeFisi"
 
-
 class PokemonApp:
     def __init__(self):
         pygame.init()
         pygame.display.set_caption(TITLE)
 
-        # RESIZABLE permite redimensionar y muestra botones nativos de la ventana
-        # (minimizar, maximizar, cerrar) en todos los sistemas operativos.
         self.screen = pygame.display.set_mode(
             (BASE_W, BASE_H),
             pygame.RESIZABLE
@@ -54,7 +48,7 @@ class PokemonApp:
         self.current_scene = None
         self._show_menu()
 
-    # ── Escenas ───────────────────────────────────────────────────────────
+    #Escenas 
     def _show_menu(self):
         play_menu()
         self.current_scene = PokemonMenu(self.screen, self._start_battle)
@@ -76,8 +70,8 @@ class PokemonApp:
                 battle_type=battle_type,
                 on_exit_callback=self._show_menu,
             )
-
-    # ── Pantalla completa ─────────────────────────────────────────────────
+            
+    #Pantalla completa
     def _toggle_fullscreen(self):
         self._fullscreen = not self._fullscreen
         if self._fullscreen:

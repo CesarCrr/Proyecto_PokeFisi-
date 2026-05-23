@@ -1,0 +1,56 @@
+[
+  {
+    "gen": 0,
+    "best": 88.2952,
+    "avg": 64.8573,
+    "worst": 42.3535,
+    "time_s": 0.0,
+    "best_cfg": {
+      "w_hp_activo": 353.41024174127915,
+      "w_hp_equipo": 53.54991337391702,
+      "w_vivos": 110.89223499970944,
+      "w_tipo_atk": 10.163319508875544,
+      "w_tipo_def": 99.75425977488706,
+      "w_mejor_dmg": 154.9820318861573,
+      "w_status_enemy": 0.6870629983965334,
+      "w_ko_bonus": 97.32952029680149,
+      "w_ko_done": 59.875393380944175,
+      "w_velocidad": 29.309059655745916,
+      "w_ace_penalty": 129.24649829552374,
+      "w_successor": 50.8148980599424,
+      "depth": 1,
+      "rival_agresividad": 0.6020176001180617,
+      "rival_switch_bias": 0.2773304429960056,
+      "rival_presion_ko": 0.6931814057124479,
+      "switch_hp_thresh": 0.23594092115733548,
+      "switch_type_mult": 3.9361254236641057
+    }
+  },
+  {
+    "gen": 1,
+    "best": 102.241,
+    "avg": 66.5743,
+    "worst": 37.3168,
+    "time_s": 1181.62,
+    "best_cfg": {
+      "w_hp_activo": 290.8918631319424,
+      "w_hp_equipo": 102.9663638864775,
+      "w_vivos": 12.634379606135923,
+      "w_tipo_atk": 91.57752509140019,
+      "w_tipo_def": 69.6073444323593,
+      "w_mejor_dmg": 183.40290639488046,
+      "w_status_enemy": 1.223570850589252,
+      "w_ko_bonus": 67.17424724206651,
+      "w_ko_done": 243.1437692833993,
+      "w_velocidad": 21.014882891480227,
+      "w_ace_penalty": 34.994707879096026,
+      "w_successor": 77.67445873531716,
+      "depth": 4,
+      "rival_agresividad": 0.8362090965273803,
+      "rival_switch_bias": 0.7567414343513417,
+      "rival_presion_ko": 0.5993177857167353,
+      "switch_hp_thresh": 0.5463741108614826,
+      "switch_type_mult": 1.8368009114306436
+    }
+  }
+]

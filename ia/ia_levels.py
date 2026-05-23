@@ -790,3 +790,4 @@ class MinimaxAI:
             return self._heuristic.get_action()
 
         return best_action
+from ia.minimax_ai import MinimaxAI4

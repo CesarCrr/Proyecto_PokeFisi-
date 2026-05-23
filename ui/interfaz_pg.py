@@ -32,6 +32,7 @@ from batalla.logica_batalla import resolve_turn, calculate_damage, get_priority
 from batalla.peligros import apply_hazards_on_switch
 from batalla.efectos import apply_move_effects
 from ia.ia_levels import RandomAI, HeuristicAI, MinimaxAI
+from ia.minimax_ai import MinimaxAI4
 from utiles.estadisticas import registrar_resultado_pve
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -477,6 +478,9 @@ class PokemonGUI:
             self.ia = RandomAI(self.ai_team, self.player_team[0])
         elif self.ai_level == 2:
             self.ia = HeuristicAI(self.ai_team, self.player_team[0])
+        elif self.ai_level == 4:
+            self.ia = MinimaxAI4(self.ai_team, self.player_team[0],
+                                 enemy_team=self.player_team)
         elif self.ai_level == 3:
             self.ia = MinimaxAI(self.ai_team, self.player_team[0],
                                enemy_team=self.player_team)

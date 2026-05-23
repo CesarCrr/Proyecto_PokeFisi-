@@ -31,6 +31,7 @@ from batalla.logica_batalla import calculate_damage, get_priority
 from batalla.peligros import apply_hazards_on_switch
 from batalla.efectos import apply_move_effects
 from ia.ia_levels import RandomAI, HeuristicAI, MinimaxAI
+from ia.minimax_ai import MinimaxAI4
 from utiles.estadisticas import registrar_resultado_simulation
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -220,6 +221,7 @@ class PokemonSimulationGUI:
         def _make_ia(level, team, enemy, enemy_team):
             if level == 1: return RandomAI(team, enemy)
             if level == 2: return HeuristicAI(team, enemy)
+            if level == 4: return MinimaxAI4(team, enemy, enemy_team=enemy_team)
             if level == 3: return MinimaxAI(team, enemy, enemy_team=enemy_team)
             return MinimaxAI(team, enemy, enemy_team=enemy_team)
         self.blue_ia = _make_ia(self.ai_level,  self.blue_team, self.red_team[0],  self.red_team)
@@ -321,16 +323,16 @@ class PokemonSimulationGUI:
             self.blue_active_idx=ni
             e.mods={"atk":0,"def":0,"spe":0,"evasion":0}
             e.protect_success=True; e.protect_fail_count=0
-            log_lines.append(f"[CAMBIO] Equipo AZUL envio a {e.nombre}")
-            log_lines+=apply_hazards_on_switch(e,self.red_hazards,True)
+            log_lines.append(f"[CAMBIO] Equipo AZUL envió a {e.nombre}")
+            log_lines+=apply_hazards_on_switch(e,self.blue_hazards,True)
 
         if red_switch:
             ni=red_action[1]; e=self.red_team[ni]
             self.red_active_idx=ni
             e.mods={"atk":0,"def":0,"spe":0,"evasion":0}
             e.protect_success=True; e.protect_fail_count=0
-            log_lines.append(f"[CAMBIO] Equipo ROJO envio a {e.nombre}")
-            log_lines+=apply_hazards_on_switch(e,self.blue_hazards,False)
+            log_lines.append(f"[CAMBIO] Equipo ROJO envió a {e.nombre}")
+            log_lines+=apply_hazards_on_switch(e,self.red_hazards,False)
 
         if blue_switch and red_switch:
             self._log_lines_delayed(log_lines[:], self._fin_de_turno)
@@ -477,7 +479,7 @@ class PokemonSimulationGUI:
             self.blue_active_idx=best; new=self.blue_team[best]
             new.mods={"atk":0,"def":0,"spe":0,"evasion":0}
             new.protect_success=True; new.protect_fail_count=0
-            msgs=apply_hazards_on_switch(new,self.red_hazards,True)
+            msgs=apply_hazards_on_switch(new,self.blue_hazards,True)
             for m in msgs: self._log_msg(m,PKM_RED)
             self._log_msg(f"[CAMBIO] 🔄 Equipo AZUL envió a {new.nombre}!",PKM_BLUE)
             # Sincronizar enemy_active_idx de la IA roja
@@ -488,7 +490,7 @@ class PokemonSimulationGUI:
             self.red_active_idx=best; new=self.red_team[best]
             new.mods={"atk":0,"def":0,"spe":0,"evasion":0}
             new.protect_success=True; new.protect_fail_count=0
-            msgs=apply_hazards_on_switch(new,self.blue_hazards,False)
+            msgs=apply_hazards_on_switch(new,self.red_hazards,False)
             for m in msgs: self._log_msg(m,PKM_RED)
             self._log_msg(f"[CAMBIO] 🔄 Equipo ROJO envió a {new.nombre}!",PKM_RED)
             # Sincronizar enemy_active_idx de la IA azul
