@@ -702,6 +702,8 @@ class PokemonGUI:
             entrante.protect_success=True; entrante.protect_fail_count=0
             log_lines += apply_hazards_on_switch(entrante, self.ai_hazards, False)
             log_lines.append(f"[CAMBIO] 🔄 IA cambió a {entrante.nombre}!")
+            self._refresh_ui()   # actualizar panel de vida inmediatamente
+            self._trigger_hp_anim_from_state()
             if player_action[0]=="move" and player_action[1] is not None:
                 def do_pl():
                     self._ejecutar_ataque_seq(self.player_team[self.player_active_idx], entrante,
@@ -742,12 +744,10 @@ class PokemonGUI:
             ap = self.ai_team[self.ai_active_idx]
             if getattr(pp, 'flying_active', False) and getattr(pp, 'flying_turns', 0) > 0:
                 pp.flying_turns -= 1
-                if pp.flying_turns == 1:
-                    self._log_lines_temp.append(f"🕊️ ¡{pp.nombre} va a aterrizar!")
+                pp.flying_charging = (pp.flying_turns == 1)  # True=carga, False=ataque
             if getattr(ap, 'flying_active', False) and getattr(ap, 'flying_turns', 0) > 0:
                 ap.flying_turns -= 1
-                if ap.flying_turns == 1:
-                    self._log_lines_temp.append(f"🕊️ ¡{ap.nombre} va a aterrizar!")
+                ap.flying_charging = (ap.flying_turns == 1)
         quien = orden[index]
         nxt   = lambda: self._procesar_accion_siguiente(orden, index+1)
         if quien == "player":
@@ -759,15 +759,17 @@ class PokemonGUI:
                 for i, m in enumerate(p.movimientos):
                     if m["nombre"] == "Enfado":
                         pmv = i; break
-            # Forzar Vuelo/Bote turno 2 automáticamente
-            if getattr(p, 'flying_active', False) and getattr(p, 'flying_turns', 0) == 1:
-                flying_mv = getattr(p, 'flying_move', None)
-                if flying_mv:
-                    for i, m in enumerate(p.movimientos):
-                        if m["nombre"] == flying_mv:
-                            pmv = i; break
-            if getattr(p, 'flying_active', False) and getattr(p, 'flying_turns', 0) == 2:
-                pmv = None
+            # Vuelo/Bote: turno carga (charging=True) → no actúa
+            # turno ataque (charging=False, turns==0) → forzar movimiento
+            if getattr(p, 'flying_active', False):
+                if getattr(p, 'flying_charging', True):
+                    pmv = None  # turno de carga, no actúa
+                else:
+                    flying_mv = getattr(p, 'flying_move', None)
+                    if flying_mv:
+                        for i, m in enumerate(p.movimientos):
+                            if m["nombre"] == flying_mv:
+                                pmv = i; break
             if pmv is not None:
                 self._ejecutar_ataque_seq(p, self.ai_team[self.ai_active_idx],
                                           pmv, self._player_force_idx,
@@ -782,15 +784,15 @@ class PokemonGUI:
                 for i, m in enumerate(p.movimientos):
                     if m["nombre"] == "Enfado":
                         amv = i; break
-            # Forzar Vuelo/Bote turno 2 automáticamente
-            if getattr(p, 'flying_active', False) and getattr(p, 'flying_turns', 0) == 1:
-                flying_mv = getattr(p, 'flying_move', None)
-                if flying_mv:
-                    for i, m in enumerate(p.movimientos):
-                        if m["nombre"] == flying_mv:
-                            amv = i; break
-            if getattr(p, 'flying_active', False) and getattr(p, 'flying_turns', 0) == 2:
-                amv = None
+            if getattr(p, 'flying_active', False):
+                if getattr(p, 'flying_charging', True):
+                    amv = None
+                else:
+                    flying_mv = getattr(p, 'flying_move', None)
+                    if flying_mv:
+                        for i, m in enumerate(p.movimientos):
+                            if m["nombre"] == flying_mv:
+                                amv = i; break
             if amv is not None:
                 self._ejecutar_ataque_seq(p, self.player_team[self.player_active_idx],
                                           amv, None,
@@ -811,26 +813,26 @@ class PokemonGUI:
             atacante.status_turns -= 1
             if atacante.status_turns <= 0:
                 atacante.status = None
-                log_lines.append(f"😴 ¡{atacante.nombre} se despertó!")
+                log_lines.append(f"😴 ¡{atacante.nombre} se despertó! No puede atacar este turno.")
             else:
                 log_lines.append(f"😴 {atacante.nombre} no puede atacar porque está dormido!")
-                self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
+            self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
 
         if atacante.status == "freeze":
             if hasattr(atacante, 'freeze_turns'):
                 atacante.freeze_turns -= 1
                 if atacante.freeze_turns <= 0:
                     atacante.status = None
-                    log_lines.append(f"❄️ ¡{atacante.nombre} se descongeló!")
+                    log_lines.append(f"❄️ ¡{atacante.nombre} se descongeló! No puede atacar este turno.")
                 else:
                     log_lines.append(f"❄️ {atacante.nombre} no puede atacar porque está congelado!")
-                    self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
+                self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
             elif rand(0.2):
                 atacante.status = None
-                log_lines.append(f"❄️ ¡{atacante.nombre} se descongeló!")
+                log_lines.append(f"❄️ ¡{atacante.nombre} se descongeló! No puede atacar este turno.")
             else:
                 log_lines.append(f"❄️ {atacante.nombre} no puede atacar porque está congelado!")
-                self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
+            self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
 
         if atacante.status == "paralyze":
             if rand(0.25):
@@ -857,16 +859,16 @@ class PokemonGUI:
         if move["pp"] <= 0:
             log_lines.append("¡Sin PP! El movimiento falló.")
             self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
-        # Turno 1 de Vuelo/Bote: el atacante sube, NO hace daño
+        # Turno carga de Vuelo/Bote: no hace daño
         if (move["nombre"] in ("Vuelo", "Bote") and
                 getattr(atacante, 'flying_active', False) and
-                getattr(atacante, 'flying_turns', 0) == 1):
+                getattr(atacante, 'flying_charging', False)):
             log_lines.append(f"🕊️ ¡{atacante.nombre} subió muy alto!")
             self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
 
         MOVES_HIT_FLYING = {"Trueno", "Onda Trueno", "Vendaval", "Tormenta"}
         if (getattr(defensor, 'flying_active', False) and
-                getattr(defensor, 'flying_turns', 0) == 1 and
+                getattr(defensor, 'flying_charging', False) and
                 move["nombre"] not in MOVES_HIT_FLYING):
             log_lines.append(f"🕊️ ¡No afecta a {defensor.nombre}! (está volando)")
             self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
@@ -1086,6 +1088,12 @@ class PokemonGUI:
 
     def _ask_player_switch(self, nuevo_pokemon, nuevo_idx):
         if self._ventana_cambio_abierta: return
+        # Si solo queda 1 Pokémon vivo, no preguntar — ir directo
+        avail_check = [i for i,p in enumerate(self.player_team)
+                       if not p.fainted and i != self.player_active_idx]
+        if not avail_check:
+            self._ventana_cambio_abierta = False
+            self._enviar_ia_pendiente(); return
         self._ventana_cambio_abierta=True
         # Limpiar callbacks pendientes del turno anterior
         self._pending_log_lines = []
@@ -1335,8 +1343,20 @@ class PokemonGUI:
         draw_text(self.screen, label, x, y, f_owner, SEL_COL)
         y += f_owner.get_height() + 0
 
-        # 2. Nombre del Pokémon + Nivel
-        draw_text(self.screen, f"{poke.nombre} N{poke.level}", x, y, f_name, PKM_BLACK)
+        # 2. Nombre + Nivel + tipos
+        nombre_txt = f"{poke.nombre} N{poke.level}"
+        draw_text(self.screen, nombre_txt, x, y, f_name, PKM_BLACK)
+        # Tipos pequeños junto al nombre
+        tipo_x = x + f_name.size(nombre_txt)[0] + 4
+        f_tipo = pkm_font(max(5, base_sz - 2))
+        for tipo in ([poke.tipo1] + ([poke.tipo2] if poke.tipo2 else [])):
+            tc, tf = TYPE_COLORS.get(tipo, ((100,100,100), (255,255,255)))
+            ts = f_tipo.render(tipo[:3].upper(), True, tf)
+            tr = pygame.Rect(tipo_x, y + 1, ts.get_width()+4, f_tipo.get_height()+2)
+            if tr.right <= inner.right:
+                pygame.draw.rect(self.screen, tc, tr, border_radius=2)
+                self.screen.blit(ts, (tipo_x+2, y+2))
+                tipo_x = tr.right + 3
         y += f_name.get_height() + 1
 
         x_hp = x
@@ -1385,7 +1405,10 @@ class PokemonGUI:
                     scaled = pygame.transform.flip(scaled, True, False)
                 ix = rect.x + (rect.width - nw) // 2
                 iy = rect.y + (rect.height - nh) // 2
-                if poke.fainted:
+                # Oscurecer solo cuando la animación de HP ya llegó a 0
+                hp_key = "player" if poke == self.player_team[self.player_active_idx] else "ai"
+                hp_anim_done = self._hp_anim[hp_key]["cur"] <= 0.001
+                if poke.fainted and hp_anim_done:
                     grey = pygame.Surface((nw, nh), pygame.SRCALPHA)
                     grey.fill((100, 100, 100, 180))
                     scaled.blit(grey, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
