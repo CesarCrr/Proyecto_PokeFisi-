@@ -36,6 +36,10 @@ def play_menu():
     play("Main_Theme.ogg")
 
 def play_battle(ai_level, ai2_level=None):
-    # Nivel 3 o 4 en cualquiera de los dos slots → Batalla_Final
-    is_final = (ai_level >= 3) or (ai2_level is not None and ai2_level >= 3)
-    play("Batalla_Final.ogg" if is_final else "Batalla_Normal.ogg")
+    max_level = max(ai_level, ai2_level or 0)
+    if max_level >= 4:
+        play("Batalla_Legend.ogg")
+    elif max_level >= 3:
+        play("Batalla_Final.ogg")
+    else:
+        play("Batalla_Normal.ogg")

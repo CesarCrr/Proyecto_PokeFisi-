@@ -87,11 +87,12 @@ class PokemonGUI:
         self._procesando_derrotado = False
         self._pokemon_ia_pendiente = None
         self._ventana_cambio_abierta = False
-        self._player_move_idx  = None
-        self._ai_move_idx      = None
-        self._player_force_idx = None
-        self._log_lines_temp   = []
+        self._player_move_idx   = None
+        self._ai_move_idx       = None
+        self._player_force_idx  = None
+        self._log_lines_temp    = []
         self._continue_callback = None
+        self._fainted_wait_until = 0   # timestamp hasta el que esperar tras fainted
 
         self._pending_log_lines = []
         self._log_delay_ms      = LOG_DELAY_MS
@@ -514,6 +515,11 @@ class PokemonGUI:
             return
         if self.state == self.STATE_CONTINUE:
             return
+        # Esperar pausa post-fainted antes de continuar
+        if self._fainted_wait_until > 0:
+            if pygame.time.get_ticks() < self._fainted_wait_until:
+                return
+            self._fainted_wait_until = 0
 
         for a in self._hp_anim.values():
             if a["animating"]:
@@ -994,7 +1000,21 @@ class PokemonGUI:
         if hasattr(ap,'is_protected'): ap.is_protected=False
         self._refresh_ui()
         self._trigger_hp_anim_from_state()
-        self._verificar_derrotados()
+        self._verificar_tras_animacion()
+
+    def _verificar_tras_animacion(self):
+        """Espera a que la animación HP termine y luego 1s si hay fainted."""
+        pp = self.player_team[self.player_active_idx]
+        ap = self.ai_team[self.ai_active_idx]
+        hay_fainted = (pp.fainted or pp.current_hp <= 0 or
+                       ap.fainted or ap.current_hp <= 0)
+        def _do_verify():
+            if hay_fainted:
+                # Pausa de 1 segundo para apreciar el sprite oscuro
+                self._fainted_wait_until = pygame.time.get_ticks() + 1000
+            self._verificar_derrotados()
+        # Encadenar callback: esperar animación HP y luego verificar
+        self._log_lines_delayed([], _do_verify)
 
     def _verificar_derrotados(self):
         if self._procesando_derrotado: return
@@ -1081,6 +1101,8 @@ class PokemonGUI:
             self._log_msg(f"[CAMBIO] 🔄 {p.nombre} al campo!", PKM_BLUE)
             self._pending_log_lines = []
             self._log_callback = None
+            self._sync_hp_on_switch()          # actualizar barra al HP real
+            self._trigger_hp_anim_from_state() # animación suave desde 0 al HP actual
             self.buttons_locked = False
             self.state = self.STATE_MOVE_SELECT
             self._refresh_ui()
@@ -1136,6 +1158,8 @@ class PokemonGUI:
         # Limpiar callbacks pendientes del turno anterior
         self._pending_log_lines = []
         self._log_callback = None
+        self._sync_hp_on_switch()          # actualizar barra al HP real
+        self._trigger_hp_anim_from_state() # animación suave
         self._procesando_derrotado=False
         self._iniciar_siguiente_turno()
 
@@ -1295,22 +1319,26 @@ class PokemonGUI:
         # Iconos Vivo/Muerto debajo de cada cuadro de vida
         dot_size = max(10, int(self.vida_w * 0.055))
         gap      = max(2, int(dot_size * 0.35))
-        for team, rect, active_idx in [
-            (self.player_team, self.rect_vida_player, self.player_active_idx),
-            (self.ai_team,     self.rect_vida_ai,     self.ai_active_idx)
+        for team, rect, active_idx, anim_key in [
+            (self.player_team, self.rect_vida_player, self.player_active_idx, "player"),
+            (self.ai_team,     self.rect_vida_ai,     self.ai_active_idx,     "ai")
         ]:
             total_w = len(team) * dot_size + (len(team)-1) * gap
             sx = rect.x + (rect.width - total_w) // 2
             sy = rect.bottom + 3
+            anim_done = self._hp_anim[anim_key]["cur"] <= 0.001
             for i, p in enumerate(team):
                 cx = sx + i*(dot_size+gap) + dot_size//2
                 cy = sy + dot_size//2
-                icon = self.icon_muerto if p.fainted else self.icon_vivo
+                # Si es el activo que acaba de morir, esperar a que la animación llegue a 0
+                es_activo_muerto = (i == active_idx and p.fainted)
+                show_dead = p.fainted and (not es_activo_muerto or anim_done)
+                icon = self.icon_muerto if show_dead else self.icon_vivo
                 if icon:
                     si = pygame.transform.smoothscale(icon, (dot_size, dot_size))
                     self.screen.blit(si, (cx - dot_size//2, cy - dot_size//2))
                 else:
-                    color  = (68,68,68) if p.fainted else HP_GREEN_PKM
+                    color  = (68,68,68) if show_dead else HP_GREEN_PKM
                     border = (180,120,0) if i==active_idx else PKM_BLACK
                     pygame.draw.circle(self.screen, color,  (cx,cy), dot_size//2)
                     pygame.draw.circle(self.screen, border, (cx,cy), dot_size//2, 2)

@@ -82,6 +82,7 @@ class PokemonSimulationGUI:
             "blue": {"cur":1.0, "tgt":1.0, "animating": False, "speed": 0.025},
             "red":  {"cur":1.0, "tgt":1.0, "animating": False, "speed": 0.025},
         }
+        self._fainted_wait_until = 0
         self.state = self.STATE_RUNNING
 
         self._load_assets()
@@ -239,6 +240,7 @@ class PokemonSimulationGUI:
             "blue": {"cur":1.0,"tgt":1.0,"animating":False,"speed":0.025},
             "red":  {"cur":1.0,"tgt":1.0,"animating":False,"speed":0.025},
         }
+        self._fainted_wait_until = 0
         self._turn_pending   = True
         self._last_turn_time = pygame.time.get_ticks()
 
@@ -251,6 +253,15 @@ class PokemonSimulationGUI:
         self._last_log_time     = pygame.time.get_ticks()
 
     def _tick_log_lines(self):
+        # Esperar pausa post-fainted
+        if self._fainted_wait_until > 0:
+            if pygame.time.get_ticks() < self._fainted_wait_until:
+                return
+            self._fainted_wait_until = 0
+        # Esperar animación HP
+        for a in self._hp_anim.values():
+            if a["animating"]:
+                return
         if not self._pending_log_lines:
             if self._log_callback:
                 cb = self._log_callback; self._log_callback = None; cb()
@@ -325,6 +336,7 @@ class PokemonSimulationGUI:
             e.protect_success=True; e.protect_fail_count=0
             log_lines.append(f"[CAMBIO] Equipo AZUL envió a {e.nombre}")
             log_lines+=apply_hazards_on_switch(e,self.blue_hazards,True)
+            self._sync_hp_on_switch()
             self._trigger_hp_anim()
 
         if red_switch:
@@ -334,6 +346,7 @@ class PokemonSimulationGUI:
             e.protect_success=True; e.protect_fail_count=0
             log_lines.append(f"[CAMBIO] Equipo ROJO envió a {e.nombre}")
             log_lines+=apply_hazards_on_switch(e,self.red_hazards,False)
+            self._sync_hp_on_switch()
             self._trigger_hp_anim()
 
         if blue_switch and red_switch:
@@ -514,9 +527,23 @@ class PokemonSimulationGUI:
                 p.flying_charging = False
         self._apply_end_effects()
         self._refresh_ui()
-        self._verify_defeated()
-        if not self._game_over_active:
-            self._turn_pending=True; self._last_turn_time=pygame.time.get_ticks()
+        self._trigger_hp_anim()
+        self._verificar_tras_animacion_sim()
+
+    def _verificar_tras_animacion_sim(self):
+        """Espera animación HP + 1s si hay fainted, luego verifica derrotados."""
+        bp = self.blue_team[self.blue_active_idx]
+        rp = self.red_team[self.red_active_idx]
+        hay_fainted = (bp.fainted or bp.current_hp <= 0 or
+                       rp.fainted or rp.current_hp <= 0)
+        def _do_verify():
+            if hay_fainted:
+                self._fainted_wait_until = pygame.time.get_ticks() + 1000
+            self._verify_defeated()
+            if not self._game_over_active:
+                self._turn_pending = True
+                self._last_turn_time = pygame.time.get_ticks()
+        self._log_lines_delayed([], _do_verify)
 
     def _apply_end_effects(self):
         bp=self.blue_team[self.blue_active_idx]
@@ -561,6 +588,7 @@ class PokemonSimulationGUI:
             msgs=apply_hazards_on_switch(new,self.blue_hazards,True)
             for m in msgs: self._log_msg(m,PKM_RED)
             self._log_msg(f"[CAMBIO] 🔄 Equipo AZUL envió a {new.nombre}!",PKM_BLUE)
+            self._sync_hp_on_switch()
             self._trigger_hp_anim()
             # Sincronizar enemy_active_idx de la IA roja
             if hasattr(self.red_ia, "enemy_active_idx"):
@@ -573,6 +601,7 @@ class PokemonSimulationGUI:
             msgs=apply_hazards_on_switch(new,self.red_hazards,False)
             for m in msgs: self._log_msg(m,PKM_RED)
             self._log_msg(f"[CAMBIO] 🔄 Equipo ROJO envió a {new.nombre}!",PKM_RED)
+            self._sync_hp_on_switch()
             self._trigger_hp_anim()
             # Sincronizar enemy_active_idx de la IA azul
             if hasattr(self.blue_ia, "enemy_active_idx"):
@@ -661,22 +690,25 @@ class PokemonSimulationGUI:
         # Iconos debajo de cada cuadro
         dot_size = max(10, int(self.vida_w * 0.055))
         gap      = max(2, int(dot_size * 0.35))
-        for team, rect, active_idx in [
-            (self.blue_team, self.rect_vida_blue, self.blue_active_idx),
-            (self.red_team,  self.rect_vida_red,  self.red_active_idx)
+        for team, rect, active_idx, anim_key in [
+            (self.blue_team, self.rect_vida_blue, self.blue_active_idx, "blue"),
+            (self.red_team,  self.rect_vida_red,  self.red_active_idx,  "red")
         ]:
             total_w = len(team) * dot_size + (len(team)-1) * gap
             sx = rect.x + (rect.width - total_w) // 2
             sy = rect.bottom + 3
+            anim_done = self._hp_anim[anim_key]["cur"] <= 0.001
             for i, p in enumerate(team):
                 cx = sx + i*(dot_size+gap) + dot_size//2
                 cy = sy + dot_size//2
-                icon = self.icon_muerto if p.fainted else self.icon_vivo
+                es_activo_muerto = (i == active_idx and p.fainted)
+                show_dead = p.fainted and (not es_activo_muerto or anim_done)
+                icon = self.icon_muerto if show_dead else self.icon_vivo
                 if icon:
                     si = pygame.transform.smoothscale(icon, (dot_size, dot_size))
                     self.screen.blit(si, (cx-dot_size//2, cy-dot_size//2))
                 else:
-                    color  = (68,68,68) if p.fainted else HP_GREEN_PKM
+                    color  = (68,68,68) if show_dead else HP_GREEN_PKM
                     border = (180,120,0) if i==active_idx else PKM_BLACK
                     pygame.draw.circle(self.screen, color,  (cx,cy), dot_size//2)
                     pygame.draw.circle(self.screen, border, (cx,cy), dot_size//2, 2)
