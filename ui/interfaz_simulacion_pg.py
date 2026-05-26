@@ -366,7 +366,12 @@ class PokemonSimulationGUI:
         bp=self.blue_team[self.blue_active_idx]; rp=self.red_team[self.red_active_idx]
         bprio=get_priority(bmv,bp); rprio=get_priority(rmv,rp)
         bspd=bp.get_effective_stat("spe"); rspd=rp.get_effective_stat("spe")
-        if bprio>rprio: orden=["blue","red"]
+        # Vuelo/Bote turno aterrizaje → siempre va primero
+        bl = getattr(bp,'flying_active',False) and getattr(bp,'flying_turns',0)==2
+        rl = getattr(rp,'flying_active',False) and getattr(rp,'flying_turns',0)==2
+        if bl and not rl: orden=["blue","red"]
+        elif rl and not bl: orden=["red","blue"]
+        elif bprio>rprio: orden=["blue","red"]
         elif rprio>bprio: orden=["red","blue"]
         else: orden=["blue","red"] if bspd>=rspd else ["red","blue"]
 
@@ -383,9 +388,9 @@ class PokemonSimulationGUI:
         if self._sim_index == 0:
             for p in [self.blue_team[self.blue_active_idx],
                       self.red_team[self.red_active_idx]]:
-                if getattr(p, 'flying_active', False) and getattr(p, 'flying_turns', 0) > 0:
-                    p.flying_turns -= 1
-                    p.flying_charging = (p.flying_turns == 1)
+                if getattr(p, 'flying_active', False) and getattr(p, 'flying_turns', 0) == 2:
+                    p.flying_turns    = 1
+                    p.flying_charging = False
         quien=self._sim_orden[self._sim_index]
         if quien=="blue":
             p=self.blue_team[self.blue_active_idx]
@@ -393,9 +398,9 @@ class PokemonSimulationGUI:
             mv=self._sim_blue_move_idx
 
             if getattr(p, 'flying_active', False):
-                if getattr(p, 'flying_charging', True):
+                if getattr(p, 'flying_turns', 0) == 2:
                     mv = None
-                else:
+                elif getattr(p, 'flying_turns', 0) == 1:
                     flying_mv = getattr(p, 'flying_move', None)
                     if flying_mv:
                         for i, m in enumerate(p.movimientos):
@@ -410,9 +415,9 @@ class PokemonSimulationGUI:
             if p.fainted or p.current_hp<=0: self._sim_index+=1; self._procesar_sim(); return
             mv=self._sim_red_move_idx
             if getattr(p, 'flying_active', False):
-                if getattr(p, 'flying_charging', True):
+                if getattr(p, 'flying_turns', 0) == 2:
                     mv = None
-                else:
+                elif getattr(p, 'flying_turns', 0) == 1:
                     flying_mv = getattr(p, 'flying_move', None)
                     if flying_mv:
                         for i, m in enumerate(p.movimientos):
@@ -461,19 +466,31 @@ class PokemonSimulationGUI:
 
         move=atacante.movimientos[move_idx]
         tag="[AZUL]" if es_azul else "[ROJO]"
+        if (move["nombre"] in ("Vuelo","Bote") and
+                getattr(atacante,"flying_active",False) and
+                getattr(atacante,"flying_turns",0)==1):
+            log_lines.append(f"🕊️ ¡{atacante.nombre} aterrizó!")
         log_lines.append(f"{tag} {atacante.nombre} usó {move['nombre']}!")
         if move["pp"]<=0:
             log_lines.append("Sin PP! Fallo.")
             self._log_lines_delayed(log_lines[:],callback); log_lines.clear(); return
         if move["nombre"] not in ["Vuelo","Bote"]: move["pp"]-=1
-        if (move["nombre"] in ("Vuelo","Bote") and
-                getattr(atacante,'flying_active',False) and
-                getattr(atacante,'flying_charging',False)):
-            log_lines.append(f" ¡{atacante.nombre} subió muy alto!")
-            self._log_lines_delayed(log_lines[:],callback); log_lines.clear(); return
+        if move["nombre"] in ("Vuelo","Bote"):
+            if not getattr(atacante,'flying_active',False):
+                # Primera vez: activar estado de vuelo
+                atacante.flying_active   = True
+                atacante.flying_turns    = 2
+                atacante.flying_charging = True
+                atacante.flying_move     = move["nombre"]
+                if move["pp"] > 0: move["pp"] -= 1
+                log_lines.append(f"🕊️ ¡{atacante.nombre} se elevó muy alto!")
+                self._log_lines_delayed(log_lines[:],callback); log_lines.clear(); return
+            elif getattr(atacante,'flying_charging',False):
+                log_lines.append(f"🕊️ ¡{atacante.nombre} se elevó muy alto!")
+                self._log_lines_delayed(log_lines[:],callback); log_lines.clear(); return
         MOVES_HIT_FLYING = {"Trueno","Onda Trueno","Vendaval","Tormenta"}
         if (getattr(defensor,'flying_active',False) and
-                getattr(defensor,'flying_charging',False) and
+                getattr(defensor,'flying_turns',0)==2 and
                 move["nombre"] not in MOVES_HIT_FLYING):
             log_lines.append(f" ¡No afecta a {defensor.nombre}! (está volando)")
             self._log_lines_delayed(log_lines[:],callback); log_lines.clear(); return
@@ -538,8 +555,9 @@ class PokemonSimulationGUI:
         self.turn+=1
         for p in [self.blue_team[self.blue_active_idx],
                   self.red_team[self.red_active_idx]]:
-            if getattr(p,'flying_active',False) and getattr(p,'flying_turns',0)==0:
+            if getattr(p,'flying_active',False) and getattr(p,'flying_turns',0)==1:
                 p.flying_active  = False
+                p.flying_turns   = 0
                 p.flying_move    = None
                 p.flying_charging = False
         self._apply_end_effects()

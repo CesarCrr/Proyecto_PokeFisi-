@@ -1,12 +1,12 @@
 {
-  "total_batallas": 11,
-  "total_turnos": 113,
-  "usa_ataques": 102,
+  "total_batallas": 12,
+  "total_turnos": 123,
+  "usa_ataques": 111,
   "usa_cambios": 4,
-  "usa_estado": 7,
+  "usa_estado": 8,
   "cambios_por_ventaja_tipo": 1,
-  "victorias_jugador": 8,
-  "agresividad": 0.889,
+  "victorias_jugador": 9,
+  "agresividad": 0.891,
   "tipo_jugador": "ofensivo",
   "historial": [
     {
@@ -95,6 +95,14 @@
       "usa_cambios": 1,
       "uso_estado": 0,
       "cambios_por_ventaja": 1,
+      "gano": true
+    },
+    {
+      "turnos": 10,
+      "usa_ataques": 9,
+      "usa_cambios": 0,
+      "uso_estado": 1,
+      "cambios_por_ventaja": 0,
       "gano": true
     }
   ]

@@ -725,11 +725,20 @@ class PokemonGUI:
 
         pp = self.player_team[self.player_active_idx]
         ap = self.ai_team[self.ai_active_idx]
-        pprio = get_priority(pmv,pp) if pmv is not None else 0
-        aprio = get_priority(amv,ap) if amv is not None else 0
-        pspd  = pp.get_effective_stat("spe")
-        aspd  = ap.get_effective_stat("spe")
-        orden = ["player","ai"] if (pprio>aprio or (pprio==aprio and pspd>=aspd)) else ["ai","player"]
+        # Vuelo/Bote turno de aterrizaje → prioridad máxima
+        # El orden se calcula ANTES del decremento, por eso turns==2 aquí = va a aterrizar
+        pp_landing = getattr(pp,'flying_active',False) and getattr(pp,'flying_turns',0)==2
+        ap_landing = getattr(ap,'flying_active',False) and getattr(ap,'flying_turns',0)==2
+        if pp_landing and not ap_landing:
+            orden = ["player","ai"]
+        elif ap_landing and not pp_landing:
+            orden = ["ai","player"]
+        else:
+            pprio = get_priority(pmv,pp) if pmv is not None else 0
+            aprio = get_priority(amv,ap) if amv is not None else 0
+            pspd  = pp.get_effective_stat("spe")
+            aspd  = ap.get_effective_stat("spe")
+            orden = ["player","ai"] if (pprio>aprio or (pprio==aprio and pspd>=aspd)) else ["ai","player"]
 
         self._player_move_idx  = pmv
         self._ai_move_idx      = amv
@@ -746,12 +755,14 @@ class PokemonGUI:
         if index == 0:
             pp = self.player_team[self.player_active_idx]
             ap = self.ai_team[self.ai_active_idx]
-            if getattr(pp, 'flying_active', False) and getattr(pp, 'flying_turns', 0) > 0:
-                pp.flying_turns -= 1
-                pp.flying_charging = (pp.flying_turns == 1)  # True=carga, False=ataque
-            if getattr(ap, 'flying_active', False) and getattr(ap, 'flying_turns', 0) > 0:
-                ap.flying_turns -= 1
-                ap.flying_charging = (ap.flying_turns == 1)
+            # Solo decrementar si flying fue activado en un turno ANTERIOR (turns==2)
+            # turns==2 → primer turno completo volando → decrementar a 1 (turno de aterrizar)
+            if getattr(pp, 'flying_active', False) and getattr(pp, 'flying_turns', 0) == 2:
+                pp.flying_turns   = 1
+                pp.flying_charging = False  # turno de aterrizar y atacar
+            if getattr(ap, 'flying_active', False) and getattr(ap, 'flying_turns', 0) == 2:
+                ap.flying_turns   = 1
+                ap.flying_charging = False
         quien = orden[index]
         nxt   = lambda: self._procesar_accion_siguiente(orden, index+1)
         if quien == "player":
@@ -764,9 +775,10 @@ class PokemonGUI:
                     if m["nombre"] == "Enfado":
                         pmv = i; break
             if getattr(p, 'flying_active', False):
-                if getattr(p, 'flying_charging', True):
-                    pmv = None  
-                else:
+                if getattr(p, 'flying_turns', 0) == 2:
+                    pmv = None  # turno de carga: no actuar
+                elif getattr(p, 'flying_turns', 0) == 1:
+                    # turno de aterrizar: forzar movimiento Vuelo/Bote
                     flying_mv = getattr(p, 'flying_move', None)
                     if flying_mv:
                         for i, m in enumerate(p.movimientos):
@@ -786,9 +798,9 @@ class PokemonGUI:
                     if m["nombre"] == "Enfado":
                         amv = i; break
             if getattr(p, 'flying_active', False):
-                if getattr(p, 'flying_charging', True):
-                    amv = None
-                else:
+                if getattr(p, 'flying_turns', 0) == 2:
+                    amv = None  # turno de carga: no actuar
+                elif getattr(p, 'flying_turns', 0) == 1:
                     flying_mv = getattr(p, 'flying_move', None)
                     if flying_mv:
                         for i, m in enumerate(p.movimientos):
@@ -804,13 +816,16 @@ class PokemonGUI:
                               es_jugador, log_lines, callback):
         if atacante.fainted or atacante.current_hp <= 0:
             if es_jugador and self.pending_switch:
-                self.pending_switch     = False
-                self.pending_switch_idx = None
-                self.pending_move_idx   = None
-                self.switch_source      = None
-                # Limpiar diálogo que pudo haber quedado abierto
-                self._dialog                 = None
-                self._ventana_cambio_abierta = False
+                self.pending_switch          = False
+                self.pending_switch_idx      = None
+                self.pending_move_idx        = None
+                self.switch_source           = None
+                self._player_force_idx = None
+            # Siempre limpiar diálogo y flags al detectar muerte del atacante
+            self._dialog                 = None
+            self._ventana_cambio_abierta = False
+            self._pending_log_lines      = []
+            self._log_callback           = None
             callback(); return
         if defensor.fainted or defensor.current_hp <= 0: callback(); return
 
@@ -860,20 +875,36 @@ class PokemonGUI:
 
         move = atacante.movimientos[move_idx]
         prefijo = "🔵" if es_jugador else "🔴"
+        # Turno aterrizaje Vuelo/Bote: anunciar antes del golpe
+        if (move["nombre"] in ("Vuelo","Bote") and
+                getattr(atacante,"flying_active",False) and
+                getattr(atacante,"flying_turns",0)==1):
+            log_lines.append(f"🕊️ ¡{atacante.nombre} aterrizó!")
         log_lines.append(f"{prefijo} {atacante.nombre} usó {move['nombre']}!")
         if move["pp"] <= 0:
             log_lines.append("¡Sin PP! El movimiento falló.")
             self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
-        # Turno carga de Vuelo/Bote: no hace daño
-        if (move["nombre"] in ("Vuelo", "Bote") and
-                getattr(atacante, 'flying_active', False) and
-                getattr(atacante, 'flying_charging', False)):
-            log_lines.append(f" ¡{atacante.nombre} subió muy alto!")
-            self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
+        # Turno carga de Vuelo/Bote:
+        # - Primera vez (flying_active=False): activar estado y salir sin daño
+        # - Ya activo en carga (flying_charging=True): salir sin daño
+        if move["nombre"] in ("Vuelo", "Bote"):
+            if not getattr(atacante, 'flying_active', False):
+                # Primera vez: activar estado de vuelo
+                atacante.flying_active   = True
+                atacante.flying_turns    = 2
+                atacante.flying_charging = True
+                atacante.flying_move     = move["nombre"]
+                if move["pp"] > 0: move["pp"] -= 1
+                log_lines.append(f"🕊️ ¡{atacante.nombre} se elevó muy alto!")
+                self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
+            elif getattr(atacante, 'flying_charging', False):
+                # Turno de carga ya activo (no debería pasar normalmente)
+                log_lines.append(f"🕊️ ¡{atacante.nombre} se elevó muy alto!")
+                self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
 
         MOVES_HIT_FLYING = {"Trueno", "Onda Trueno", "Vendaval", "Tormenta"}
         if (getattr(defensor, 'flying_active', False) and
-                getattr(defensor, 'flying_charging', False) and
+                getattr(defensor, 'flying_turns', 0) == 2 and
                 move["nombre"] not in MOVES_HIT_FLYING):
             log_lines.append(f" ¡No afecta a {defensor.nombre}! (está volando)")
             self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
@@ -922,16 +953,22 @@ class PokemonGUI:
                 self.pending_move_idx   = None
                 self.switch_source      = None
                 new_p = self.player_team[new_idx]
-                self.player_active_idx = new_idx
-                new_p.mods={"atk":0,"def":0,"spe":0,"evasion":0}
-                new_p.protect_success=True; new_p.protect_fail_count=0
-                h = apply_hazards_on_switch(new_p, self.player_hazards, True)
-                log_lines.append(f"🔄 ¡{old_name} regresó! ¡{new_p.nombre} salió al campo!")
-                log_lines += h
-                if new_p.fainted:
-                    log_lines.append(f"💀 ¡{new_p.nombre} fue derrotado por las trampas!")
-                self._sync_hp_on_switch()
-                self._trigger_hp_anim_from_state()
+                # 1. Mostrar el daño primero, luego hacer el cambio
+                def _do_uturn_switch(ni=new_idx, on=old_name, np=new_p):
+                    self.player_active_idx = ni
+                    np.mods={"atk":0,"def":0,"spe":0,"evasion":0}
+                    np.protect_success=True; np.protect_fail_count=0
+                    h = apply_hazards_on_switch(np, self.player_hazards, True)
+                    switch_lines = [f"🔄 ¡{on} regresó! ¡{np.nombre} salió al campo!"] + h
+                    if np.fainted:
+                        switch_lines.append(f"💀 ¡{np.nombre} fue derrotado por las trampas!")
+                    # Actualizar barra del entrante y mostrar mensajes, luego continuar
+                    self._sync_hp_on_switch()
+                    self._trigger_hp_anim_from_state()
+                    self._log_lines_delayed(switch_lines, callback)
+                self._log_lines_delayed(log_lines[:], _do_uturn_switch)
+                log_lines.clear()
+                return
         else:
             apply_move_effects(atacante,defensor,move,effect_msgs,es_jugador,self.player_hazards,self.ai_hazards)
             log_lines+=effect_msgs
@@ -963,6 +1000,13 @@ class PokemonGUI:
         if not self.player_team or not self.ai_team: return
         pp = self.player_team[self.player_active_idx]
         ap = self.ai_team[self.ai_active_idx]
+        # Limpiar flying_active si ya aterrizó
+        for pokemon in [pp, ap]:
+            if getattr(pokemon,'flying_active',False) and getattr(pokemon,'flying_turns',0)==1:
+                pokemon.flying_active   = False
+                pokemon.flying_move     = None
+                pokemon.flying_charging = False
+                pokemon.flying_turns    = 0
         for pokemon in [pp, ap]:
             if getattr(pokemon, 'flying_active', False) and getattr(pokemon, 'flying_turns', 0) == 0:
                 pokemon.flying_active = False
@@ -1006,11 +1050,15 @@ class PokemonGUI:
         self._verificar_tras_animacion()
 
     def _verificar_tras_animacion(self):
+        if self._ventana_cambio_abierta:
+            return 
         pp = self.player_team[self.player_active_idx]
         ap = self.ai_team[self.ai_active_idx]
         hay_fainted = (pp.fainted or pp.current_hp <= 0 or
                        ap.fainted or ap.current_hp <= 0)
         def _do_verify():
+            if self._ventana_cambio_abierta:
+                return 
             if hay_fainted:
                 self._fainted_wait_until = pygame.time.get_ticks() + 1000
             self._verificar_derrotados()
@@ -1084,6 +1132,12 @@ class PokemonGUI:
         avail = [i for i,p in enumerate(self.player_team) if not p.fainted]
         def cb(idx):
             self._dialog=None; self._ventana_cambio_abierta=False
+            self.pending_switch = False
+            self.pending_switch_idx = None
+            self.pending_move_idx = None
+            self.switch_source = None
+            self._player_force_idx = None 
+
             p=self.player_team[idx]
             msgs=apply_hazards_on_switch(p,self.player_hazards,True)
             for m in msgs: self._log_msg(m, PKM_RED)
@@ -1095,12 +1149,19 @@ class PokemonGUI:
             p.mods={"atk":0,"def":0,"spe":0,"evasion":0}
             p.protect_success=True; p.protect_fail_count=0
             self._log_msg(f"[CAMBIO] 🔄 {p.nombre} al campo!", PKM_BLUE)
-            self._pending_log_lines = []
-            self._log_callback = None
-            self._sync_hp_on_switch()       
-            self._trigger_hp_anim_from_state() 
+            # Limpiar TODO estado pendiente que pueda rebloquear
+            self._pending_log_lines      = []
+            self._log_callback           = None
+            self._fainted_wait_until     = 0
+            self._procesando_derrotado   = False
+            self._dialog                 = None
+            self._ventana_cambio_abierta = False
+            self._continue_callback = None
+            self._sync_hp_on_switch()
+            self._trigger_hp_anim_from_state()
+            # Desbloquear directamente sin pasar por _iniciar_siguiente_turno
             self.buttons_locked = False
-            self.state = self.STATE_MOVE_SELECT
+            self.state          = self.STATE_MOVE_SELECT
             self._refresh_ui()
         self._show_force_switch("Tu Pokemon fue derrotado! Elige:", avail, cb)
 
