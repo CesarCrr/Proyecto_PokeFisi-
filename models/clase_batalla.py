@@ -23,13 +23,11 @@ class BattlePokemon:
         self.tipo2 = data["tipo2"]
         self.level = level
         
-        # Estadísticas base
         self.hp_base = data["hp"]
         self.atk_base = data["atk"]
         self.def_base = data["def_"]
         self.spe_base = data["spe"]
         
-        # Calcular estadísticas reales según nivel 55
         self.max_hp = self._calcular_hp(self.hp_base)
         self.current_hp = self.max_hp
         self.atk = self._calcular_estadistica(self.atk_base)
@@ -94,14 +92,11 @@ class BattlePokemon:
         self.leech_seed_from = None
 
     def _calcular_estadistica(self, base):
-        # Fórmula simplificada para stats normales (Atk, Def, Spe):
-        # ((2 * Base * Nivel) / 100) + 5
+        # Fórmula: ((2 * Base * Nivel) / 100) + 5
         nivel = self.level
         return int(((2 * base * nivel) / 100) + 5)
     
     def _calcular_hp(self, base):
-        # Fórmula simplificada para HP:
-        # ((2 * Base * Nivel) / 100) + Nivel + 10
         nivel = self.level
         return int(((2 * base * nivel) / 100) + nivel + 10)
 
@@ -109,7 +104,6 @@ class BattlePokemon:
         if stat == "evasion":
             return get_evasion_mod(self.mods["evasion"])
         
-        # Obtener la estadística base según el nivel
         if stat == "atk":
             base = self.atk
         elif stat == "def":
@@ -119,7 +113,6 @@ class BattlePokemon:
         else:
             base = self.atk
         
-        # Aplicar modificadores de stage
         return int(base * get_stat_stage_mod(self.mods[stat]))
 
     def apply_damage(self, damage, ignore_substitute=False):

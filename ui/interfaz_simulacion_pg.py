@@ -253,12 +253,10 @@ class PokemonSimulationGUI:
         self._last_log_time     = pygame.time.get_ticks()
 
     def _tick_log_lines(self):
-        # Esperar pausa post-fainted
         if self._fainted_wait_until > 0:
             if pygame.time.get_ticks() < self._fainted_wait_until:
                 return
             self._fainted_wait_until = 0
-        # Esperar animación HP
         for a in self._hp_anim.values():
             if a["animating"]:
                 return
@@ -307,7 +305,6 @@ class PokemonSimulationGUI:
 
     def _start_turn(self):
         if self._game_over_active: return
-        # Sincronizar blue_ia con estado actual
         self.blue_ia.active_idx = self.blue_active_idx
         self.blue_ia.enemy      = self.red_team[self.red_active_idx]
         if hasattr(self.blue_ia, "enemy_team"):
@@ -383,7 +380,6 @@ class PokemonSimulationGUI:
             self._log_lines_temp=[]
             self._log_lines_delayed(rest, self._fin_de_turno)
             return
-        # Decrementar flying_turns al inicio del turno (index==0)
         if self._sim_index == 0:
             for p in [self.blue_team[self.blue_active_idx],
                       self.red_team[self.red_active_idx]]:
@@ -395,7 +391,7 @@ class PokemonSimulationGUI:
             p=self.blue_team[self.blue_active_idx]
             if p.fainted or p.current_hp<=0: self._sim_index+=1; self._procesar_sim(); return
             mv=self._sim_blue_move_idx
-            # Vuelo/Bote: turno carga → no actúa; turno ataque → forzar movimiento
+
             if getattr(p, 'flying_active', False):
                 if getattr(p, 'flying_charging', True):
                     mv = None
@@ -434,14 +430,13 @@ class PokemonSimulationGUI:
         if atacante.fainted or atacante.current_hp <= 0: callback(); return
         if defensor.fainted or defensor.current_hp <= 0: callback(); return
 
-        # Verificar estado del atacante antes de atacar
         if atacante.status == "sleep":
             atacante.status_turns -= 1
             if atacante.status_turns <= 0:
                 atacante.status = None
-                log_lines.append(f"😴 ¡{atacante.nombre} se despertó! No puede atacar este turno.")
+                log_lines.append(f" ¡{atacante.nombre} se despertó! No puede atacar este turno.")
             else:
-                log_lines.append(f"😴 {atacante.nombre} no puede atacar porque está dormido!")
+                log_lines.append(f" {atacante.nombre} no puede atacar porque está dormido!")
             self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
 
         if atacante.status == "freeze":
@@ -449,19 +444,19 @@ class PokemonSimulationGUI:
                 atacante.freeze_turns -= 1
                 if atacante.freeze_turns <= 0:
                     atacante.status = None
-                    log_lines.append(f"❄️ ¡{atacante.nombre} se descongeló! No puede atacar este turno.")
+                    log_lines.append(f" ¡{atacante.nombre} se descongeló! No puede atacar este turno.")
                 else:
-                    log_lines.append(f"❄️ {atacante.nombre} no puede atacar porque está congelado!")
+                    log_lines.append(f" {atacante.nombre} no puede atacar porque está congelado!")
             elif rand(0.2):
                 atacante.status = None
-                log_lines.append(f"❄️ ¡{atacante.nombre} se descongeló! No puede atacar este turno.")
+                log_lines.append(f" ¡{atacante.nombre} se descongeló! No puede atacar este turno.")
             else:
-                log_lines.append(f"❄️ {atacante.nombre} no puede atacar porque está congelado!")
+                log_lines.append(f" {atacante.nombre} no puede atacar porque está congelado!")
             self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
 
         if atacante.status == "paralyze":
             if rand(0.25):
-                log_lines.append(f"⚡ {atacante.nombre} está paralizado y no puede moverse!")
+                log_lines.append(f" {atacante.nombre} está paralizado y no puede moverse!")
                 self._log_lines_delayed(log_lines[:], callback); log_lines.clear(); return
 
         move=atacante.movimientos[move_idx]
@@ -471,18 +466,16 @@ class PokemonSimulationGUI:
             log_lines.append("Sin PP! Fallo.")
             self._log_lines_delayed(log_lines[:],callback); log_lines.clear(); return
         if move["nombre"] not in ["Vuelo","Bote"]: move["pp"]-=1
-        # Turno carga Vuelo/Bote: no hace daño
         if (move["nombre"] in ("Vuelo","Bote") and
                 getattr(atacante,'flying_active',False) and
                 getattr(atacante,'flying_charging',False)):
-            log_lines.append(f"🕊️ ¡{atacante.nombre} subió muy alto!")
+            log_lines.append(f" ¡{atacante.nombre} subió muy alto!")
             self._log_lines_delayed(log_lines[:],callback); log_lines.clear(); return
-        # Inmunidad del defensor volando
         MOVES_HIT_FLYING = {"Trueno","Onda Trueno","Vendaval","Tormenta"}
         if (getattr(defensor,'flying_active',False) and
                 getattr(defensor,'flying_charging',False) and
                 move["nombre"] not in MOVES_HIT_FLYING):
-            log_lines.append(f"🕊️ ¡No afecta a {defensor.nombre}! (está volando)")
+            log_lines.append(f" ¡No afecta a {defensor.nombre}! (está volando)")
             self._log_lines_delayed(log_lines[:],callback); log_lines.clear(); return
         if not rand(move["precision"]):
             log_lines.append(f"{atacante.nombre} fallo!")
@@ -510,6 +503,31 @@ class PokemonSimulationGUI:
                 log_lines.append(f"[DERROTA] {defensor.nombre} derrotado!")
             apply_move_effects(atacante,defensor,move,effect_msgs,es_azul,self.blue_hazards,self.red_hazards)
             log_lines+=effect_msgs
+            # Ida y Vuelta / Voltio Cambio: cambiar DESPUÉS del daño
+            if move["nombre"] in ("Ida y Vuelta","Voltio Cambio"):
+                team    = self.blue_team if es_azul else self.red_team
+                act_idx = self.blue_active_idx if es_azul else self.red_active_idx
+                hazards = self.red_hazards if es_azul else self.blue_hazards
+                avail   = [i for i,p in enumerate(team)
+                           if not p.fainted and i != act_idx]
+                if avail:
+                    # Elegir el Pokémon con más HP
+                    new_idx = max(avail, key=lambda i: team[i].current_hp)
+                    new_p   = team[new_idx]
+                    old_name = atacante.nombre
+                    if es_azul:
+                        self.blue_active_idx = new_idx
+                    else:
+                        self.red_active_idx = new_idx
+                    new_p.mods={"atk":0,"def":0,"spe":0,"evasion":0}
+                    new_p.protect_success=True; new_p.protect_fail_count=0
+                    h = apply_hazards_on_switch(new_p, hazards, es_azul)
+                    log_lines.append(f"🔄 ¡{old_name} regresó! ¡{new_p.nombre} salió al campo!")
+                    log_lines += h
+                    if new_p.fainted:
+                        log_lines.append(f"💀 ¡{new_p.nombre} fue derrotado por las trampas!")
+                    self._sync_hp_on_switch()
+                    self._trigger_hp_anim()
         else:
             apply_move_effects(atacante,defensor,move,effect_msgs,es_azul,self.blue_hazards,self.red_hazards)
             log_lines+=effect_msgs
@@ -518,7 +536,6 @@ class PokemonSimulationGUI:
     def _fin_de_turno(self):
         if self._game_over_active: return
         self.turn+=1
-        # Limpiar flying_active si ya aterrizó
         for p in [self.blue_team[self.blue_active_idx],
                   self.red_team[self.red_active_idx]]:
             if getattr(p,'flying_active',False) and getattr(p,'flying_turns',0)==0:
@@ -531,7 +548,6 @@ class PokemonSimulationGUI:
         self._verificar_tras_animacion_sim()
 
     def _verificar_tras_animacion_sim(self):
-        """Espera animación HP + 1s si hay fainted, luego verifica derrotados."""
         bp = self.blue_team[self.blue_active_idx]
         rp = self.red_team[self.red_active_idx]
         hay_fainted = (bp.fainted or bp.current_hp <= 0 or
@@ -590,7 +606,6 @@ class PokemonSimulationGUI:
             self._log_msg(f"[CAMBIO] 🔄 Equipo AZUL envió a {new.nombre}!",PKM_BLUE)
             self._sync_hp_on_switch()
             self._trigger_hp_anim()
-            # Sincronizar enemy_active_idx de la IA roja
             if hasattr(self.red_ia, "enemy_active_idx"):
                 self.red_ia.enemy_active_idx = self.blue_active_idx
         if rp.fainted and ra:
@@ -600,7 +615,7 @@ class PokemonSimulationGUI:
             new.protect_success=True; new.protect_fail_count=0
             msgs=apply_hazards_on_switch(new,self.red_hazards,False)
             for m in msgs: self._log_msg(m,PKM_RED)
-            self._log_msg(f"[CAMBIO] 🔄 Equipo ROJO envió a {new.nombre}!",PKM_RED)
+            self._log_msg(f"[CAMBIO]  Equipo ROJO envió a {new.nombre}!",PKM_RED)
             self._sync_hp_on_switch()
             self._trigger_hp_anim()
             # Sincronizar enemy_active_idx de la IA azul
@@ -624,9 +639,8 @@ class PokemonSimulationGUI:
             Button(pygame.Rect(ci.x+4,by,bw,bh),"Nueva batalla",f,tag="restart",text_align="left"),
             Button(pygame.Rect(ci.x+4+bw+8,by,bw,bh),"Menu Principal",f,tag="menu",text_align="left"),
         ]
-
+    #Actualizar Barra de Vida
     def _sync_hp_on_switch(self):
-        """Salta la barra al HP real del nuevo Pokémon activo (sin animación)."""
         if not self.blue_team or not self.red_team: return
         bp = self.blue_team[self.blue_active_idx]
         rp = self.red_team[self.red_active_idx]
@@ -637,7 +651,6 @@ class PokemonSimulationGUI:
             self._hp_anim[key]["animating"] = False
 
     def _trigger_hp_anim(self):
-        """Lanza animación suave de HP desde el valor actual al HP real."""
         if not self.blue_team or not self.red_team: return
         bp = self.blue_team[self.blue_active_idx]
         rp = self.red_team[self.red_active_idx]
@@ -687,7 +700,6 @@ class PokemonSimulationGUI:
         self._draw_one_vida(self.rect_vida_red,self.vida_inner_red,
                             rp,self.red_team,self.red_active_idx,
                             f"IA Nivel {self.ai2_level}",self._hp_anim["red"]["cur"],PKM_RED, flip=False)
-        # Iconos debajo de cada cuadro
         dot_size = max(10, int(self.vida_w * 0.055))
         gap      = max(2, int(dot_size * 0.35))
         for team, rect, active_idx, anim_key in [
@@ -766,7 +778,6 @@ class PokemonSimulationGUI:
         bar_w = inner.width - 8
         bar_h = max(6, int(inner.height * 0.12))
         draw_hp_bar(self.screen, pygame.Rect(x,y,bar_w,bar_h), hp_cur, dark_bg=False)
-        # Iconos dibujados en _draw_vida_panels debajo del cuadro
 
     def _draw_sprites(self):
         if not self.blue_team or not self.red_team: return

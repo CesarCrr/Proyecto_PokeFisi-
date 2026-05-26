@@ -3,10 +3,7 @@ import copy
 from batalla.tabla_tipos import get_type_multiplier
 from batalla.logica_batalla import calculate_damage
 
-#  sin depender de objetos BattlePokemon reales.
-
 def _get_stat_stage_mod(stage):
-    """Replicar get_stat_stage_mod sin importar utiles."""
     clamp = max(-6, min(6, stage))
     table = {-6: 2/8, -5: 2/7, -4: 2/6, -3: 2/5, -2: 2/4, -1: 2/3,
               0: 1.0,
@@ -14,10 +11,6 @@ def _get_stat_stage_mod(stage):
     return table.get(clamp, 1.0)
 
 def _snap_damage(atk_snap, def_snap, move):
-    """
-    Calcula daño usando solo datos del snapshot (dicts).
-    Devuelve (damage, type_mult).  No toca ningun objeto real.
-    """
     if move["poder"] <= 0:
         return 0, 1.0
 
@@ -39,7 +32,6 @@ def _snap_damage(atk_snap, def_snap, move):
     return damage, type_mult
 
 def _snap_spe(psnap):
-    """Velocidad efectiva desde snapshot."""
     return max(1, int(psnap["spe"] * _get_stat_stage_mod(psnap["mods"].get("spe", 0))))
 
 #  IA Nivel 1 — Aleatoria
@@ -54,7 +46,6 @@ class RandomAI:
         outrage = getattr(current, 'outrage_locked', False)
         flying  = getattr(current, 'flying_active', False)
         if outrage:
-            # Forzar movimiento Enfado
             for i, m in enumerate(current.movimientos):
                 if m["nombre"] == "Enfado":
                     return ("move", i)
@@ -76,7 +67,7 @@ class RandomAI:
             return ("move", random.choice(moves_with_pp))
         return ("move", 0)
 
-#  IA Nivel 2 — Heuristica basica
+#  IA Nivel 2 — Heuristica
 class HeuristicAI:
     def __init__(self, team, enemy_pokemon):
         self.team       = team
@@ -213,53 +204,16 @@ class HeuristicAI:
             return ("switch", switch_idx)
         return ("move", self._get_best_move(current, self.enemy))
 
-#
-#  Principios de disenio:
-#
-#  1. ARBOL 100% BASADO EN SNAPSHOTS
-#
-#     Perfil adaptativo con tres dimensiones:
-#
-#  3. EVALUACION ESTRATEGICA
-#       de un umbral de HP critico.
-#       ataque super efectivo el proximo turno.
-#
-#     snapshots, nunca mutando el estado real.
-
+#Rival Comportamient (IA Nivel 3)
+# Agresivo, Cambiar y Presion KO
 class RivalModel:
-    """
-    Perfil del comportamiento esperado del rival.
-
-    En lugar de asumir que el rival siempre jugara optimo (MIN puro),
-    RivalModel estima una distribucion de probabilidad sobre sus acciones
-    segun tres rasgos: agresividad, tendencia a cambiar y presion de KO.
-
-    Esto permite anticipar cambios defensivos cuando el rival esta en
-    desventaja, y cambios ofensivos cuando detecta ventaja de tipo.
-
-    Los rasgos se inicializan con ruido aleatorio para que cada instancia
-    de la IA sea unica y menos predecible desde el lado del rival humano.
-    """
-
     def __init__(self):
-        # Ruido inicial para variabilidad entre partidas
-        self.agresividad  = 0.65 + random.uniform(-0.15, 0.15)  # 0=pasivo, 1=agresivo
-        self.switch_bias  = 0.45 + random.uniform(-0.10, 0.10)  # prob base de cambiar
-        self.presion_ko   = 0.70 + random.uniform(-0.10, 0.10)  # prioridad al KO
-
+        self.agresividad  = 0.65 + random.uniform(-0.15, 0.15)  
+        self.switch_bias  = 0.45 + random.uniform(-0.10, 0.10)  
+        self.presion_ko   = 0.70 + random.uniform(-0.10, 0.10)  
+    # Logica para cambio o ataque
     def accion_weights(self, en_snap, my_snap, enemy_movs, enemy_team_snaps, en_idx):
-        """
-        Devuelve lista de (peso, action) para las acciones del rival.
-        Los pesos NO suman 1; se normalizan al usarlos.
-
-        Logica:
-          - Si el rival esta en desventaja de tipo severa  => bonus a switch
-          - Si puede hacer KO este turno                   => bonus a ataque
-          - Si tiene el activo muy bajo de HP              => bonus a switch
-          - Si hay un cambio con ventaja de tipo clara     => bonus a ese cambio
-        """
         results = []
-
         best_atk_dmg = 0
         for i, mv in enumerate(enemy_movs):
             if mv["pp"] <= 0:
@@ -269,7 +223,6 @@ class RivalModel:
                 w = 0.01
             elif mv["poder"] > 0:
                 expected = dmg * mv["precision"]
-                # Bonus por presion de KO
                 ko_bonus  = self.presion_ko * 2.0 if dmg >= my_snap["hp"] else 0
                 w = self.agresividad * (expected / max(my_snap["max_hp"], 1) * 3 + ko_bonus)
                 if expected > best_atk_dmg:
@@ -295,7 +248,6 @@ class RivalModel:
                                                cand_snap["tipo1"], cand_snap["tipo2"])
                 cand_hp_pct = cand_snap["hp"] / cand_snap["max_hp"] if cand_snap["max_hp"] > 0 else 0
 
-                # Peso base del cambio
                 w  = self.switch_bias
                 w *= (cand_adv / 2.0)
                 w *= (1.0 / max(cand_def, 0.25))
@@ -311,14 +263,9 @@ class RivalModel:
         if not results:
             results.append((1.0, ("move", 0)))
         return results
-
+    
+#IA Nivel 3 -MINIMAX
 class MinimaxAI:
-    """
-    IA Nivel 3: Expectiminimax con arbol 100% basado en snapshots.
-
-    Ver cabecera del modulo para descripcion completa del disenio.
-    """
-
     DEPTH     = 3
     CRIT_PROB = 0.0625
     CRIT_MULT = 1.5
@@ -332,10 +279,7 @@ class MinimaxAI:
         self._heuristic       = HeuristicAI(team, enemy_pokemon)
         self._rival           = RivalModel()
 
-    #
-
     def _make_psnap(self, p):
-        """Snapshot de un BattlePokemon."""
         return {
             "hp":      p.current_hp,
             "max_hp":  p.max_hp,
@@ -369,8 +313,6 @@ class MinimaxAI:
                 p.mods       = dict(ps["mods"])
         self.active_idx = snap["my_idx"]
 
-    #  ACCESORES SEGUROS sobre snapshots
-
     def _my_snap(self, snap):
         return snap["my_team"][snap["my_idx"]]
 
@@ -379,26 +321,21 @@ class MinimaxAI:
             return snap["en_team"][snap["en_idx"]]
         return self._make_psnap(self.enemy)
 
-    #  EVALUACION ESTRATEGICA
-
     def _evaluate(self, snap):
         my_snap = self._my_snap(snap)
         en_snap = self._en_snap(snap)
         score   = 0.0
 
-        # 1. HP relativo del activo
         my_pct = my_snap["hp"] / my_snap["max_hp"] if my_snap["max_hp"] > 0 else 0
         en_pct = en_snap["hp"] / en_snap["max_hp"] if en_snap["max_hp"] > 0 else 0
         score += (my_pct - en_pct) * 200
 
-        # 2. HP total del equipo
         my_team_hp    = sum(p["hp"] for p in snap["my_team"] if not p["fainted"])
         my_team_total = sum(p["max_hp"] for p in snap["my_team"] if not p["fainted"]) or 1
         en_team_hp    = sum(p["hp"] for p in snap["en_team"] if not p["fainted"]) if snap["en_team"] else en_snap["hp"]
         en_team_total = sum(p["max_hp"] for p in snap["en_team"] if not p["fainted"]) or 1 if snap["en_team"] else en_snap["max_hp"] or 1
         score += (my_team_hp / my_team_total - en_team_hp / en_team_total) * 150
 
-        # 3. Numero de Pokemon vivos
         my_alive = sum(1 for p in snap["my_team"] if not p["fainted"])
         en_alive = sum(1 for p in snap["en_team"] if not p["fainted"]) if snap["en_team"] else (0 if en_snap["fainted"] else 1)
         score += (my_alive - en_alive) * 60
@@ -407,7 +344,6 @@ class MinimaxAI:
             mult = get_type_multiplier(tipo, en_snap["tipo1"], en_snap["tipo2"])
             score += (mult - 1.0) * 35
 
-        # 5. Resistencia defensiva del activo propio
         for tipo in ([en_snap["tipo1"]] + ([en_snap["tipo2"]] if en_snap["tipo2"] else [])):
             def_mult = get_type_multiplier(tipo, my_snap["tipo1"], my_snap["tipo2"])
             score -= (def_mult - 1.0) * 28  # castigo por permanecer en desventaja
@@ -422,7 +358,6 @@ class MinimaxAI:
                         best_dmg = exp
         score += (best_dmg / en_snap["max_hp"]) * 100 if en_snap["max_hp"] > 0 else 0
 
-        # 7. Estados de alteracion
         status_val = {"burn": 25, "poison": 20, "toxic": 30,
                       "paralyze": 20, "sleep": 35, "freeze": 40, "infectado": 15}
         if my_snap["status"]:
@@ -430,13 +365,11 @@ class MinimaxAI:
         if en_snap["status"]:
             score += status_val.get(en_snap["status"], 10) * 0.6
 
-        # 8. Amenaza de KO inmediato
         if en_snap["max_hp"] > 0 and best_dmg >= en_snap["hp"]:
             score += 80
         if en_snap["fainted"] or en_snap["hp"] <= 0:
             score += 150
 
-        # 9. Ventaja de velocidad
         my_spe = _snap_spe(my_snap)
         en_spe = _snap_spe(en_snap)
         score += 15 if my_spe > en_spe else (-15 if my_spe < en_spe else 0)
@@ -445,7 +378,7 @@ class MinimaxAI:
             ace = max(snap["my_team"], key=lambda p: p["max_hp"])
             ace_pct = ace["hp"] / ace["max_hp"] if ace["max_hp"] > 0 else 0
             if ace_pct < 0.40 and not ace["fainted"]:
-                score -= (0.40 - ace_pct) * 120  # penalizacion progresiva
+                score -= (0.40 - ace_pct) * 120  # 
 
         if my_pct < 0.25:
             best_successor = 0.0
@@ -472,13 +405,9 @@ class MinimaxAI:
                     )
                     if cand_adv >= 2.0:
                         score -= 25
-
         return score
 
-    #  MOVE ORDERING sobre snapshots
-
     def _score_move_snap(self, mv, atk_snap, def_snap):
-        """Score rapido de un movimiento usando snapshots."""
         if mv["pp"] <= 0:
             return -9999
         dmg, tm = _snap_damage(atk_snap, def_snap, mv)
@@ -486,7 +415,6 @@ class MinimaxAI:
             return -9999
         if mv["poder"] > 0:
             return dmg * mv["precision"]
-        # Movimiento de estado: score heuristico simplificado
         eff  = mv["efecto"].lower()
         nome = mv["nombre"].lower()
         s    = 15
@@ -501,7 +429,6 @@ class MinimaxAI:
         return s
 
     def _score_switch_snap(self, cand_snap, en_snap):
-        """Score de traer a cand_snap contra en_snap."""
         if cand_snap["fainted"] or cand_snap["hp"] <= 0:
             return -9999
         hp_pct   = cand_snap["hp"] / cand_snap["max_hp"] if cand_snap["max_hp"] > 0 else 0
@@ -513,7 +440,6 @@ class MinimaxAI:
         return hp_pct * 100 + type_adv
 
     def _my_actions_ordered(self, snap):
-        """Top-3 movimientos + Top-2 cambios propios, desde el snapshot."""
         my_snap = self._my_snap(snap)
         en_snap = self._en_snap(snap)
 
@@ -537,7 +463,6 @@ class MinimaxAI:
         return actions if actions else [("move", 0)]
 
     def _apply_my_action(self, action, snap, crit=False, miss=False):
-        """Devuelve snapshot nuevo tras la accion de la IA."""
         new = copy.deepcopy(snap)
 
         if action[0] == "switch":
@@ -565,7 +490,6 @@ class MinimaxAI:
         return new
 
     def _apply_enemy_action(self, action, snap, crit=False, miss=False):
-        """Devuelve snapshot nuevo tras la accion del rival."""
         new = copy.deepcopy(snap)
 
         if action[0] == "switch_enemy":
@@ -592,11 +516,7 @@ class MinimaxAI:
                 my_snap["fainted"] = my_snap["hp"] <= 0
         return new
 
-    #  EXPECTIMINIMAX con poda alfa-beta
-    #
-    #  Flujo de nodos por turno completo:
-    #
-
+    #Poda alfa-beta
     def _avg_precision(self, psnap):
         atk_movs = [m for m in psnap["movs"] if m["pp"] > 0 and m["poder"] > 0]
         if not atk_movs:
@@ -609,7 +529,6 @@ class MinimaxAI:
         return not my_alive or not en_alive
 
     def _expectiminimax(self, depth, alpha, beta, node_type, snap):
-        # Caso base
         if depth == 0 or self._terminal(snap):
             return self._evaluate(snap)
 
@@ -664,7 +583,6 @@ class MinimaxAI:
             my_snap  = self._my_snap(snap)
             skip_p   = 0.25 if en_snap["status"] == "paralyze" else 0.0
 
-            # Obtener pesos del RivalModel
             weights_actions = self._rival.accion_weights(
                 en_snap, my_snap,
                 en_snap["movs"],
@@ -675,7 +593,6 @@ class MinimaxAI:
             weights_actions.sort(key=lambda x: x[0], reverse=True)
             total_w = sum(w for w, _ in weights_actions)
 
-            # con 30% ponderado por el modelo.
             min_pure = float("inf")
             weighted_val = 0.0
 
@@ -696,7 +613,6 @@ class MinimaxAI:
 
             min_val = 0.70 * min_pure + 0.30 * weighted_val
 
-            # Paralizacion del rival
             if skip_p > 0:
                 val_skip = self._expectiminimax(depth - 1, alpha, beta, "max", snap)
                 min_val  = (1.0 - skip_p) * min_val + skip_p * val_skip
@@ -727,10 +643,7 @@ class MinimaxAI:
                   + prec * self.CRIT_PROB       * val_crit
                   + (1 - prec)                  * val_miss)
 
-        # Fallback
         return self._evaluate(snap)
-
-    #  ENTRADA PRINCIPAL
 
     def get_action(self):
         current = self.team[self.active_idx]
@@ -759,7 +672,6 @@ class MinimaxAI:
                 return ("switch", alive[0][0])
             return ("move", 0)
 
-        # Transicion: rival caido, usar heuristica
         if self.enemy.fainted or self.enemy.current_hp <= 0:
             self._heuristic.team       = self.team
             self._heuristic.active_idx = self.active_idx

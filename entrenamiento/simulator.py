@@ -5,21 +5,17 @@ from models.clase_batalla   import BattlePokemon
 
 _HAZARDS = {"stealth_rock": False, "spikes": 0, "toxic_spikes": 0}
 
-
 def _random_team(size: int = 6) -> list:
     chosen = random.sample(POKEMON_DB, min(size, len(POKEMON_DB)))
     return [BattlePokemon(p) for p in chosen]
 
-
 def _alive(team):
     return [i for i, p in enumerate(team) if not p.fainted]
-
 
 def _hp_frac(team):
     total   = sum(p.max_hp for p in team)
     current = sum(p.current_hp for p in team if not p.fainted)
     return current / total if total > 0 else 0.0
-
 
 def _sync(ia, team, active_idx, enemy, enemy_team, enemy_active_idx):
     ia.team             = team
@@ -30,38 +26,30 @@ def _sync(ia, team, active_idx, enemy, enemy_team, enemy_active_idx):
     if hasattr(ia, "enemy_active_idx"):
         ia.enemy_active_idx = enemy_active_idx
 
-
 def simulate_battle(ia_a, ia_b, team_a: list, team_b: list,
                     max_turns: int = 80) -> dict:
     team_a = [copy.deepcopy(p) for p in team_a]
     team_b = [copy.deepcopy(p) for p in team_b]
     ha     = copy.deepcopy(_HAZARDS)
     hb     = copy.deepcopy(_HAZARDS)
-    ai_a   = 0  # active index A
-    ai_b   = 0  # active index B
+    ai_a   = 0 
+    ai_b   = 0  
 
     for turn in range(max_turns):
         la = _alive(team_a)
         lb = _alive(team_b)
         if not la or not lb:
             break
-
-        # Asegurar índices activos vivos
         if team_a[ai_a].fainted:
             ai_a = la[0]
         if team_b[ai_b].fainted:
             ai_b = lb[0]
-
         pa = team_a[ai_a]
         pb = team_b[ai_b]
-
         _sync(ia_a, team_a, ai_a, pb, team_b, ai_b)
         action_a = ia_a.get_action()
-
         _sync(ia_b, team_b, ai_b, pa, team_a, ai_a)
         action_b = ia_b.get_action()
-
-        # Decodificar acciones
         a_switch   = action_a[0] == "switch"
         b_switch   = action_b[0] == "switch"
         a_move_idx = None if a_switch else action_a[1]
@@ -89,7 +77,6 @@ def simulate_battle(ia_a, ia_b, team_a: list, team_b: list,
             ai_hazards                   = hb,
         )
 
-        # Actualizar índices activos tras cambios o muertes
         if a_switch and a_new_idx is not None:
             ai_a = a_new_idx
         if b_switch and b_new_idx is not None:

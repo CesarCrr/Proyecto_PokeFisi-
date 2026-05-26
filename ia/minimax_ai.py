@@ -11,7 +11,8 @@ MinimaxAI (Nivel 3) NO se modifica en absoluto.
 
 import random, copy
 from ia.ia_levels  import MinimaxAI, HeuristicAI, RivalModel
-from ia.config     import load_config
+from ia.config          import load_config
+from ia.memoria_jugador import cargar_perfil, ajustar_rival_model
 from batalla.tabla_tipos import get_type_multiplier
 
 
@@ -46,6 +47,9 @@ class MinimaxAI4(MinimaxAI):
         self.cfg    = cfg or load_config()
         self.DEPTH  = self.cfg["depth"]
         self._rival = ConfiguredRivalModel(self.cfg)
+        # Cargar perfil del jugador y ajustar el RivalModel
+        self._perfil_jugador = cargar_perfil()
+        ajustar_rival_model(self._rival, self._perfil_jugador)
 
     def _evaluate(self, snap) -> float:
         cfg     = self.cfg

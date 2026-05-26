@@ -35,11 +35,6 @@ def _guardar(data):
         pass
 
 def registrar_resultado_pve(ganador, ai_level):
-    """
-    Registra el resultado de una batalla Jugador vs IA.
-    ganador: "player" o "ai"
-    ai_level: 1 o 2
-    """
     data = _cargar()
     clave = f"ia{ai_level}"
     if clave not in data:
@@ -51,12 +46,6 @@ def registrar_resultado_pve(ganador, ai_level):
     _guardar(data)
 
 def registrar_resultado_simulation(ganador_color, ai1_level, ai2_level):
-    """
-    Registra el resultado de una batalla IA vs IA.
-    ganador_color: "blue" (IA1) o "red" (IA2)
-    ai1_level: nivel de IA azul (1 o 2)
-    ai2_level: nivel de IA roja (1 o 2)
-    """
     data = _cargar()
     clave1 = f"ia{ai1_level}"
     clave2 = f"ia{ai2_level}"
@@ -73,10 +62,8 @@ def registrar_resultado_simulation(ganador_color, ai1_level, ai2_level):
     _guardar(data)
 
 def obtener_estadisticas():
-    """Devuelve el diccionario de estadísticas."""
     return _cargar()
 
 def resetear_estadisticas():
-    """Reinicia todas las estadísticas a cero."""
     data = {k: dict(v) for k, v in STATS_DEFAULTS.items()}
     _guardar(data)

@@ -115,12 +115,12 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
         player_pokemon.status = "sleep"
         player_pokemon.status_turns = random.randint(2, 3)
         player_pokemon.sleep_next = False
-        log_lines.append(f"😴 ¡{player_pokemon.nombre} se durmió por Bostezo!")
+        log_lines.append(f" ¡{player_pokemon.nombre} se durmió por Bostezo!")
     if hasattr(ai_pokemon, 'sleep_next') and ai_pokemon.sleep_next:
         ai_pokemon.status = "sleep"
         ai_pokemon.status_turns = random.randint(2, 3)
         ai_pokemon.sleep_next = False
-        log_lines.append(f"😴 ¡{ai_pokemon.nombre} se durmió por Bostezo!")
+        log_lines.append(f" ¡{ai_pokemon.nombre} se durmió por Bostezo!")
 
     def _ejecutar_aterrizaje(atacante, defensor, log):
         move_name = atacante.flying_move
@@ -132,7 +132,7 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
             return False
         if move["pp"] > 0:
             move["pp"] -= 1
-        log.append(f"🕊️ {atacante.nombre} usó {move['nombre']}!")
+        log.append(f" {atacante.nombre} usó {move['nombre']}!")
         special = calculate_special_damage(atacante, defensor, move)
         damage, type_mult = special if special else calculate_damage(atacante, defensor, move)
         if type_mult == 0:
@@ -140,24 +140,24 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
             return False
         if rand(0.0625):
             damage = int(damage * 1.5)
-            log.append("💥 ¡Golpe crítico!")
+            log.append(" ¡Golpe crítico!")
         defensor.apply_damage(damage)
         if type_mult >= 2:
             log.append(f"¡Es muy efectivo! (x{type_mult})")
         elif type_mult < 1:
             log.append(f"No es muy efectivo... (x{type_mult})")
-        log.append(f"💢 {defensor.nombre} recibió {damage} de daño.")
+        log.append(f" {defensor.nombre} recibió {damage} de daño.")
         if move["nombre"] in ["Gigadrenado", "Puño Drenaje"]:
             drain = int(damage * 0.5)
             atacante.heal(drain)
-            log.append(f"💚 {atacante.nombre} absorbió {drain} HP!")
+            log.append(f" {atacante.nombre} absorbió {drain} HP!")
         if move["nombre"] == "Pajaro Osado":
             recoil = int(damage / 3)
             atacante.apply_damage(recoil, True)
-            log.append(f"⚠️ {atacante.nombre} recibió {recoil} de retroceso!")
+            log.append(f" {atacante.nombre} recibió {recoil} de retroceso!")
         if defensor.current_hp <= 0:
             defensor.fainted = True
-            log.append(f"💀 ¡{defensor.nombre} fue derrotado!")
+            log.append(f" ¡{defensor.nombre} fue derrotado!")
             return True
         return False
 
@@ -173,12 +173,12 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
     if player_pokemon.outrage_active:
         enfado_idx = next((i for i, m in enumerate(player_pokemon.movimientos) if m["nombre"] == "Enfado"), player_move_idx)
         player_move_idx = enfado_idx
-        log_lines.append(f"😤 {player_pokemon.nombre} está enfurecido! (Quedan {player_pokemon.outrage_turns} turnos)")
+        log_lines.append(f" {player_pokemon.nombre} está enfurecido! (Quedan {player_pokemon.outrage_turns} turnos)")
 
     if ai_pokemon.outrage_active:
         enfado_idx = next((i for i, m in enumerate(ai_pokemon.movimientos) if m["nombre"] == "Enfado"), ai_move_idx)
         ai_move_idx = enfado_idx
-        log_lines.append(f"😤 {ai_pokemon.nombre} está enfurecido! (Quedan {ai_pokemon.outrage_turns} turnos)")
+        log_lines.append(f" {ai_pokemon.nombre} está enfurecido! (Quedan {ai_pokemon.outrage_turns} turnos)")
 
     # Decrementar Enfado al final del turno (después de atacar)
     for pokemon in [player_pokemon, ai_pokemon]:
@@ -190,25 +190,25 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
             pokemon.outrage_locked = False
             pokemon.confused = True
             pokemon.confused_turns = random.randint(2, 5)
-            log_lines.append(f"😵 ¡{pokemon.nombre} ya no está enfurecido! ¡{pokemon.nombre} está confundido!")
+            log_lines.append(f" ¡{pokemon.nombre} ya no está enfurecido! ¡{pokemon.nombre} está confundido!")
 
     def check_confusion(pokemon, log):
         if pokemon.confused:
             pokemon.confused_turns -= 1
             if rand(0.5):
                 confusion_damage = max(1, int((pokemon.get_effective_stat("atk") / pokemon.get_effective_stat("def")) * 40))
-                log.append(f"😵 ¡{pokemon.nombre} está confundido y se golpeó a sí mismo!")
+                log.append(f" ¡{pokemon.nombre} está confundido y se golpeó a sí mismo!")
                 pokemon.apply_damage(confusion_damage, True)
                 if pokemon.current_hp <= 0:
-                    log.append(f"💀 ¡{pokemon.nombre} se derrotó a sí mismo!")
+                    log.append(f" ¡{pokemon.nombre} se derrotó a sí mismo!")
                 if pokemon.confused_turns <= 0:
                     pokemon.confused = False
-                    log.append(f"😵 {pokemon.nombre} ya no está confundido.")
+                    log.append(f" {pokemon.nombre} ya no está confundido.")
                 return False
             else:
                 if pokemon.confused_turns <= 0:
                     pokemon.confused = False
-                    log.append(f"😵 {pokemon.nombre} ya no está confundido.")
+                    log.append(f" {pokemon.nombre} ya no está confundido.")
         return True
 
     def check_status(pokemon, log):
@@ -216,30 +216,37 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
             pokemon.status_turns -= 1
             if pokemon.status_turns <= 0:
                 pokemon.status = None
-                log.append(f"😴 ¡{pokemon.nombre} se despertó! No puede atacar este turno.")
-            return False  # no ataca el turno que se despierta ni mientras duerme
+                log.append(f" ¡{pokemon.nombre} se despertó! ")
+                return True
+            else:
+                log.append(f" {pokemon.nombre} está dormido y no puede moverse!")
+                return False
         if pokemon.status == "freeze":
             if hasattr(pokemon, 'freeze_turns'):
                 pokemon.freeze_turns -= 1
                 if pokemon.freeze_turns <= 0:
                     pokemon.status = None
-                    log.append(f"❄️ ¡{pokemon.nombre} se descongeló! No puede atacar este turno.")
+                    log.append(f" ¡{pokemon.nombre} se descongeló! ")
+                    return True
                 else:
-                    log.append(f"❄️ {pokemon.nombre} no puede atacar porque está congelado!")
-                return False  # no ataca el turno que se descongela
+                    log.append(f" {pokemon.nombre} no puede atacar porque está congelado!")
+                    return False  
             if rand(0.2):
                 pokemon.status = None
-                log.append(f"❄️ ¡{pokemon.nombre} se descongeló! No puede atacar este turno.")
-            return False  # no ataca el turno que se descongela ni mientras está congelado
+                log.append(f" ¡{pokemon.nombre} se descongeló!")
+                return True 
+            else:
+                log.append(f" {pokemon.nombre} no puede atacar porque está congelado!")
+                return False
         if pokemon.status == "paralyze":
             if hasattr(pokemon, 'paralyze_turns'):
                 pokemon.paralyze_turns -= 1
                 if pokemon.paralyze_turns <= 0:
                     pokemon.status = None
-                    log.append(f"⚡ ¡{pokemon.nombre} ya no está paralizado!")
+                    log.append(f" ¡{pokemon.nombre} ya no está paralizado!")
                     return True
             if rand(0.25):
-                log.append(f"⚡ {pokemon.nombre} está paralizado y no puede moverse!")
+                log.append(f" {pokemon.nombre} está paralizado y no puede moverse!")
                 return False
         return True
 
@@ -268,13 +275,13 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
                 if player_move_idx is not None:
                     move = player_pokemon.movimientos[player_move_idx]
                     if move["poder"] == 0:
-                        log_lines.append(f"😤 ¡{player_pokemon.nombre} está provocado y no puede usar {move['nombre']}!")
+                        log_lines.append(f" ¡{player_pokemon.nombre} está provocado y no puede usar {move['nombre']}!")
                         continue
             if hasattr(ai_pokemon, 'is_protected') and ai_pokemon.is_protected:
                 if player_move_idx is not None:
                     move = player_pokemon.movimientos[player_move_idx]
                     if move["poder"] > 0:
-                        log_lines.append(f"🛡️ ¡{ai_pokemon.nombre} se protegió del ataque de {player_pokemon.nombre}!")
+                        log_lines.append(f" ¡{ai_pokemon.nombre} se protegió del ataque de {player_pokemon.nombre}!")
                         ai_pokemon.is_protected = False
                         continue
             if not check_status(player_pokemon, log_lines):
@@ -288,14 +295,12 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
             
             if move["nombre"] in ["Vuelo", "Bote"]:
                 if player_pokemon.flying_turns == 0 and not player_pokemon.flying_active:
-                    log_lines.append(f"🔵 {player_pokemon.nombre} usó {move['nombre']}!")
+                    log_lines.append(f" {player_pokemon.nombre} usó {move['nombre']}!")
                     apply_move_effects(player_pokemon, ai_pokemon, move, log_lines, True, player_hazards, ai_hazards)
                     continue
             
-            # Log del movimiento
-            log_lines.append(f"🔵 {player_pokemon.nombre} usó {move['nombre']}!")
+            log_lines.append(f" {player_pokemon.nombre} usó {move['nombre']}!")
             
-            # Verificar PP
             if move["pp"] <= 0:
                 log_lines.append("¡Sin PP! El movimiento falló.")
                 continue
@@ -304,7 +309,7 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
                 move["pp"] -= 1
             
             if not can_be_hit(player_pokemon, ai_pokemon, move):
-                log_lines.append(f"🕊️ ¡{ai_pokemon.nombre} está volando y {player_pokemon.nombre} no puede alcanzarlo!")
+                log_lines.append(f" ¡{ai_pokemon.nombre} está volando y {player_pokemon.nombre} no puede alcanzarlo!")
                 continue
                 
             # Precisión
@@ -316,7 +321,6 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
                     log_lines.append(f"¡{player_pokemon.nombre} falló el ataque!")
                     continue
             
-            # Daño
             if move["poder"] > 0:
                 special = calculate_special_damage(player_pokemon, ai_pokemon, move)
                 if special:
@@ -327,7 +331,7 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
                 for _ in range(hits):
                     if rand(0.0625):
                         damage = int(damage * 1.5)
-                        log_lines.append(f"💥 ¡Golpe crítico!")
+                        log_lines.append(f" ¡Golpe crítico!")
                     ai_pokemon.apply_damage(damage)
                     if type_mult >= 2:
                         log_lines.append(f"¡Es muy efectivo! (x{type_mult})")
@@ -337,15 +341,15 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
                         break
                     elif type_mult < 1:
                         log_lines.append(f"No es muy efectivo... (x{type_mult})")
-                    log_lines.append(f"💢 {ai_pokemon.nombre} recibió {damage} de daño.")
+                    log_lines.append(f" {ai_pokemon.nombre} recibió {damage} de daño.")
                     if move["nombre"] in ["Gigadrenado", "Puño Drenaje"]:
                         drain = int(damage * 0.5)
                         player_pokemon.heal(drain)
-                        log_lines.append(f"💚 {player_pokemon.nombre} absorbió {drain} HP!")
+                        log_lines.append(f" {player_pokemon.nombre} absorbió {drain} HP!")
                     if move["nombre"] == "Pajaro Osado":
                         recoil = int(damage / 3)
                         player_pokemon.apply_damage(recoil, True)
-                        log_lines.append(f"⚠️ {player_pokemon.nombre} recibió {recoil} de retroceso!")
+                        log_lines.append(f" {player_pokemon.nombre} recibió {recoil} de retroceso!")
                 apply_move_effects(player_pokemon, ai_pokemon, move, log_lines, True, player_hazards, ai_hazards)
             else:
                 apply_move_effects(player_pokemon, ai_pokemon, move, log_lines, True, player_hazards, ai_hazards)
@@ -353,27 +357,27 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
             if move["nombre"] in ["Ida y Vuelta", "Voltio Cambio"] and not player_pokemon.fainted:
                 if ai_pokemon.current_hp <= 0:
                     ai_pokemon.fainted = True
-                    log_lines.append(f"💀 ¡{ai_pokemon.nombre} fue derrotado!")
+                    log_lines.append(f" ¡{ai_pokemon.nombre} fue derrotado!")
                 return (move["nombre"].lower().replace(" ", "_"), player_pokemon)
                 
             if ai_pokemon.current_hp <= 0:
                 ai_pokemon.fainted = True
-                log_lines.append(f"💀 ¡{ai_pokemon.nombre} fue derrotado!")
+                log_lines.append(f" ¡{ai_pokemon.nombre} fue derrotado!")
         
-        else:  # turn_order == "ai"
+        else:  
             if ai_pokemon.fainted or player_pokemon.fainted:
                 continue
             if hasattr(ai_pokemon, 'taunted') and ai_pokemon.taunted:
                 if ai_move_idx is not None:
                     move = ai_pokemon.movimientos[ai_move_idx]
                     if move["poder"] == 0:
-                        log_lines.append(f"😤 ¡{ai_pokemon.nombre} está provocado y no puede usar {move['nombre']}!")
+                        log_lines.append(f" ¡{ai_pokemon.nombre} está provocado y no puede usar {move['nombre']}!")
                         continue
             if hasattr(player_pokemon, 'is_protected') and player_pokemon.is_protected:
                 if ai_move_idx is not None:
                     move = ai_pokemon.movimientos[ai_move_idx]
                     if move["poder"] > 0:
-                        log_lines.append(f"🛡️ ¡{player_pokemon.nombre} se protegió del ataque de {ai_pokemon.nombre}!")
+                        log_lines.append(f" ¡{player_pokemon.nombre} se protegió del ataque de {ai_pokemon.nombre}!")
                         player_pokemon.is_protected = False
                         continue
             if not check_status(ai_pokemon, log_lines):
@@ -387,11 +391,11 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
             
             if move["nombre"] in ["Vuelo", "Bote"]:
                 if ai_pokemon.flying_turns == 0 and not ai_pokemon.flying_active:
-                    log_lines.append(f"🔴 {ai_pokemon.nombre} usó {move['nombre']}!")
+                    log_lines.append(f" {ai_pokemon.nombre} usó {move['nombre']}!")
                     apply_move_effects(ai_pokemon, player_pokemon, move, log_lines, False, player_hazards, ai_hazards)
                     continue
             
-            log_lines.append(f"🔴 {ai_pokemon.nombre} usó {move['nombre']}!")
+            log_lines.append(f" {ai_pokemon.nombre} usó {move['nombre']}!")
             
             if move["pp"] <= 0:
                 log_lines.append("¡Sin PP! El movimiento falló.")
@@ -401,7 +405,7 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
                 move["pp"] -= 1
             
             if not can_be_hit(ai_pokemon, player_pokemon, move):
-                log_lines.append(f"🕊️ ¡{player_pokemon.nombre} está volando y {ai_pokemon.nombre} no puede alcanzarlo!")
+                log_lines.append(f" ¡{player_pokemon.nombre} está volando y {ai_pokemon.nombre} no puede alcanzarlo!")
                 continue
                 
             accuracy = move["precision"]
@@ -422,7 +426,7 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
                 for _ in range(hits):
                     if rand(0.0625):
                         damage = int(damage * 1.5)
-                        log_lines.append(f"💥 ¡Golpe crítico!")
+                        log_lines.append(f" ¡Golpe crítico!")
                     player_pokemon.apply_damage(damage)
                     if type_mult >= 2:
                         log_lines.append(f"¡Es muy efectivo! (x{type_mult})")
@@ -432,22 +436,22 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
                         break
                     elif type_mult < 1:
                         log_lines.append(f"No es muy efectivo... (x{type_mult})")
-                    log_lines.append(f"💢 {player_pokemon.nombre} recibió {damage} de daño.")
+                    log_lines.append(f" {player_pokemon.nombre} recibió {damage} de daño.")
                     if move["nombre"] in ["Gigadrenado", "Puño Drenaje"]:
                         drain = int(damage * 0.5)
                         ai_pokemon.heal(drain)
-                        log_lines.append(f"💚 {ai_pokemon.nombre} absorbió {drain} HP!")
+                        log_lines.append(f" {ai_pokemon.nombre} absorbió {drain} HP!")
                     if move["nombre"] == "Pajaro Osado":
                         recoil = int(damage / 3)
                         ai_pokemon.apply_damage(recoil, True)
-                        log_lines.append(f"⚠️ {ai_pokemon.nombre} recibió {recoil} de retroceso!")
+                        log_lines.append(f" {ai_pokemon.nombre} recibió {recoil} de retroceso!")
                 apply_move_effects(ai_pokemon, player_pokemon, move, log_lines, False, player_hazards, ai_hazards)
             else:
                 apply_move_effects(ai_pokemon, player_pokemon, move, log_lines, False, player_hazards, ai_hazards)
             
             if player_pokemon.current_hp <= 0:
                 player_pokemon.fainted = True
-                log_lines.append(f"💀 ¡{player_pokemon.nombre} fue derrotado!")
+                log_lines.append(f" ¡{player_pokemon.nombre} fue derrotado!")
 
     for pokemon in [player_pokemon, ai_pokemon]:
         if pokemon.fainted:
@@ -459,43 +463,43 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
                 pokemon.burn_turns -= 1
                 if pokemon.burn_turns <= 0:
                     pokemon.status = None
-                    log_lines.append(f"🔥 ¡La quemadura de {pokemon.nombre} terminó!")
-            log_lines.append(f"🔥 {pokemon.nombre} sufre daño por quemadura ({damage} HP).")
+                    log_lines.append(f" ¡La quemadura de {pokemon.nombre} terminó!")
+            log_lines.append(f" {pokemon.nombre} sufre daño por quemadura ({damage} HP).")
         if pokemon.status == "poison":
             damage = int(pokemon.max_hp / 16 * pokemon.poison_counter)
             pokemon.poison_counter += 1
             pokemon.apply_damage(damage, True)
-            log_lines.append(f"☠️ {pokemon.nombre} sufre daño por veneno ({damage} HP).")
+            log_lines.append(f" {pokemon.nombre} sufre daño por veneno ({damage} HP).")
         if pokemon.status == "toxic":
             damage = int(pokemon.max_hp / 16 * pokemon.poison_counter)
             pokemon.poison_counter += 1
             pokemon.apply_damage(damage, True)
-            log_lines.append(f"☠️ {pokemon.nombre} sufre daño por veneno grave ({damage} HP).")
+            log_lines.append(f" {pokemon.nombre} sufre daño por veneno grave ({damage} HP).")
         
         if pokemon.status == "infectado":
             damage = int(pokemon.max_hp / 8)
             pokemon.apply_damage(damage, True)
             if hasattr(pokemon, 'leech_seed_from') and pokemon.leech_seed_from and not pokemon.leech_seed_from.fainted:
                 pokemon.leech_seed_from.heal(damage)
-                log_lines.append(f"🌱 {pokemon.nombre} pierde {damage} HP por estar infectado y {pokemon.leech_seed_from.nombre} recupera {damage} HP.")
+                log_lines.append(f" {pokemon.nombre} pierde {damage} HP por estar infectado y {pokemon.leech_seed_from.nombre} recupera {damage} HP.")
             else:
-                log_lines.append(f"🌱 {pokemon.nombre} pierde {damage} HP por estar infectado.")
+                log_lines.append(f" {pokemon.nombre} pierde {damage} HP por estar infectado.")
             if pokemon.current_hp <= 0:
                 pokemon.fainted = True
-                log_lines.append(f"💀 ¡{pokemon.nombre} fue derrotado!")
+                log_lines.append(f" ¡{pokemon.nombre} fue derrotado!")
         
         if pokemon.current_hp <= 0:
             pokemon.fainted = True
-            log_lines.append(f"💀 ¡{pokemon.nombre} fue derrotado!")
+            log_lines.append(f" ¡{pokemon.nombre} fue derrotado!")
 
     # Deseo
     if player_pokemon.wish_heal > 0:
         player_pokemon.heal(player_pokemon.wish_heal)
-        log_lines.append(f"✨ ¡El Deseo de {player_pokemon.nombre} se cumple! Recupera {player_pokemon.wish_heal} HP.")
+        log_lines.append(f" ¡El Deseo de {player_pokemon.nombre} se cumple! Recupera {player_pokemon.wish_heal} HP.")
         player_pokemon.wish_heal = 0
     if ai_pokemon.wish_heal > 0:
         ai_pokemon.heal(ai_pokemon.wish_heal)
-        log_lines.append(f"✨ ¡El Deseo de {ai_pokemon.nombre} se cumple! Recupera {ai_pokemon.wish_heal} HP.")
+        log_lines.append(f" ¡El Deseo de {ai_pokemon.nombre} se cumple! Recupera {ai_pokemon.wish_heal} HP.")
         ai_pokemon.wish_heal = 0
 
     # Mofa
@@ -503,14 +507,13 @@ def resolve_turn(player_pokemon, ai_pokemon, player_move_idx, ai_move_idx,
         player_pokemon.taunted_turns -= 1
         if player_pokemon.taunted_turns <= 0:
             player_pokemon.taunted = False
-            log_lines.append(f"😤 {player_pokemon.nombre} ya no está provocado.")
+            log_lines.append(f" {player_pokemon.nombre} ya no está provocado.")
     if hasattr(ai_pokemon, 'taunted') and ai_pokemon.taunted:
         ai_pokemon.taunted_turns -= 1
         if ai_pokemon.taunted_turns <= 0:
             ai_pokemon.taunted = False
-            log_lines.append(f"😤 {ai_pokemon.nombre} ya no está provocado.")
+            log_lines.append(f" {ai_pokemon.nombre} ya no está provocado.")
 
-    # Resetear protección
     if hasattr(player_pokemon, 'is_protected'):
         player_pokemon.is_protected = False
     if hasattr(ai_pokemon, 'is_protected'):

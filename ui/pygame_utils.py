@@ -1,10 +1,8 @@
-# pygame_utils.py — Utilidades compartidas para la interfaz Pygame de PokeFisi
 import pygame
 import os
 import pickle
 import hashlib
 
-# Ruta base del proyecto (una carpeta arriba de ui/)
 _BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _FONT_PATH = os.path.join(_BASE_DIR, "fuente_letra", "Pokemon_Classic.ttf")
 
@@ -12,13 +10,11 @@ _FONT_PATH = os.path.join(_BASE_DIR, "fuente_letra", "Pokemon_Classic.ttf")
 _CACHE_DIR = os.path.join(_BASE_DIR, "cache")
 os.makedirs(_CACHE_DIR, exist_ok=True)
 
-# ── Caché global persistente ──────────────────────────────────────────────────
 _global_img_cache = {}
 _global_gif_cache = {}
 _global_preloaded = False
 _global_preloaded_gifs = {}
 
-# ── Colores ──────────────────────────────────────────────────────────────────
 BG       = (26,  26,  46)
 BG2      = (22,  33,  62)
 BG3      = (15,  52,  96)
@@ -91,8 +87,6 @@ HP_GREEN_PKM = (50,  180, 50)
 HP_GOLD_PKM  = (220, 160, 0)
 HP_RED_PKM   = (220, 40,  40)
 
-
-# ── Fuentes ──────────────────────────────────────────────────────────────────
 _font_cache: dict = {}
 
 def get_font(size: int, bold: bool = False, classic: bool = False) -> pygame.font.Font:
@@ -118,14 +112,11 @@ def get_font(size: int, bold: bool = False, classic: bool = False) -> pygame.fon
 def pkm_font(size: int) -> pygame.font.Font:
     return get_font(size, classic=True)
 
-
-# ── Dibujado básico ──────────────────────────────────────────────────────────
 def draw_rect_alpha(surface: pygame.Surface, color: tuple,
                     rect: pygame.Rect, alpha: int = 180, radius: int = 0):
     s = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
     pygame.draw.rect(s, (*color[:3], alpha), s.get_rect(), border_radius=radius)
     surface.blit(s, rect.topleft)
-
 
 def draw_text(surface: pygame.Surface, text: str, x: int, y: int,
               font: pygame.font.Font, color=TEXTCOL,
@@ -144,7 +135,6 @@ def draw_text(surface: pygame.Surface, text: str, x: int, y: int,
     surface.blit(rendered, rect)
     return rect
 
-
 def draw_hp_bar(surface: pygame.Surface, rect: pygame.Rect,
                 pct: float, dark_bg: bool = True):
     bg_col = (50, 50, 50) if dark_bg else (180, 180, 180)
@@ -158,8 +148,6 @@ def draw_hp_bar(surface: pygame.Surface, rect: pygame.Rect,
         pygame.draw.rect(surface, color, filled, border_radius=3)
     pygame.draw.rect(surface, PKM_BLACK, rect, 2, border_radius=3)
 
-
-# ── Carga de imágenes con caché global ───────────────────────────────────────
 def load_image_pil(path: str, size: tuple, keep_alpha: bool = True) -> pygame.Surface | None:
     key = (path, size)
     if key in _global_img_cache:
@@ -177,14 +165,10 @@ def load_image_pil(path: str, size: tuple, keep_alpha: bool = True) -> pygame.Su
     except Exception:
         return None
 
-
 def load_bg_image(path: str, size: tuple) -> pygame.Surface | None:
     return load_image_pil(path, size, keep_alpha=False)
 
-
-# ── Carga de GIFs con caché en disco ─────────────────────────────────────────
 def _process_gif_frames(path: str, size: tuple) -> list:
-    """Procesa los frames de un GIF (versión corregida - animación suave)"""
     try:
         from PIL import Image
         
@@ -195,25 +179,21 @@ def _process_gif_frames(path: str, size: tuple) -> list:
         total_frames = gif.n_frames
         print(f"  Procesando {path}: {total_frames} frames")
         
-        # Cargar TODOS los frames para mantener la animación fluida
         for i in range(total_frames):
             gif.seek(i)
-            duration = gif.info.get("duration", 100)  # NO multiplicar
-            if duration < 30:  # Asegurar duración mínima
+            duration = gif.info.get("duration", 100)  
+            if duration < 30: 
                 duration = 100
             
             frame = gif.convert("RGBA")
             
-            # Escalar manteniendo proporción (más rápido)
             original_w, original_h = frame.size
             scale = min(target_w / original_w, target_h / original_h)
             new_w = max(1, int(original_w * scale))
             new_h = max(1, int(original_h * scale))
             
-            # Escalar de una vez (más eficiente que dos pasos)
             frame_resized = frame.resize((new_w, new_h), Image.LANCZOS)
             
-            # Centrar en el tamaño objetivo
             final = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
             paste_x = (target_w - new_w) // 2
             paste_y = (target_h - new_h) // 2
@@ -223,11 +203,9 @@ def _process_gif_frames(path: str, size: tuple) -> list:
             surf = pygame.image.fromstring(raw, (target_w, target_h), "RGBA")
             frames.append((surf, duration))
             
-            # Permitir que pygame procese eventos cada 10 frames
             if i % 10 == 0:
                 pygame.event.pump()
         
-        # Si no se cargó ningún frame, usar el primero como estático
         if not frames and total_frames > 0:
             gif.seek(0)
             frame = gif.convert("RGBA").resize((target_w, target_h), Image.LANCZOS)
@@ -242,7 +220,6 @@ def _process_gif_frames(path: str, size: tuple) -> list:
         return []
     
 def load_gif_frames_with_cache(path: str, size: tuple) -> list:
-    """Carga frames de GIF con caché en disco"""
     cache_key = hashlib.md5(f"{path}_{size[0]}_{size[1]}".encode()).hexdigest()
     cache_file = os.path.join(_CACHE_DIR, f"gif_{cache_key}.pickle")
     
@@ -262,7 +239,6 @@ def load_gif_frames_with_cache(path: str, size: tuple) -> list:
         pass
     
     return frames
-
 
 class GifSprite:
     def __init__(self, path: str, size: tuple):
@@ -302,10 +278,7 @@ class GifSprite:
 def load_pokemon_gif(path: str, size: tuple) -> "GifSprite":
     return GifSprite(path, size)
 
-
-# ── Precarga esencial (solo imágenes pequeñas) ───────────────────────────────
 def preload_all_resources():
-    """Precarga SOLO recursos esenciales (no GIFs pesados)"""
     global _global_preloaded
     
     if _global_preloaded:
@@ -333,7 +306,6 @@ def preload_all_resources():
 
 
 def get_preloaded_gif(name: str, target_size: tuple = None) -> 'GifSprite':
-    """Obtiene un GIF (carga bajo demanda, usa caché en disco)"""
     name_lower = name.lower()
     
     if target_size is None:
@@ -361,15 +333,12 @@ def get_preloaded_gif(name: str, target_size: tuple = None) -> 'GifSprite':
 
 
 def limpiar_cache_gifs():
-    """Elimina todos los GIFs en caché para forzar reprocesamiento"""
     import shutil
     if os.path.exists(_CACHE_DIR):
         shutil.rmtree(_CACHE_DIR)
         os.makedirs(_CACHE_DIR)
         print("Caché de GIFs limpiada")
 
-
-# ── Clase botón ──────────────────────────────────────────────────────────────
 class Button:
     def __init__(self, rect: pygame.Rect, text: str, font: pygame.font.Font,
                  bg=None, fg=PKM_BLACK, hover_bg=None, disabled=False,
@@ -421,8 +390,6 @@ class Button:
     def hovered(self):
         return self._hovered
 
-
-# ── Clase TextLog ────────────────────────────────────────────────────────────
 class TextLog:
     MAX_LINES = 120
 

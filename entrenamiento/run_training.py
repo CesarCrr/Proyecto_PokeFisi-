@@ -15,17 +15,14 @@ LOG_PATH = os.path.join(
     "data", "training_log.json"
 )
 
-# ── Colores ANSI ──────────────────────────────────────────────────────────
 GRN = "\033[92m"; YLW = "\033[93m"; RED = "\033[91m"
 CYN = "\033[96m"; BLD = "\033[1m";  RST = "\033[0m"
-
 
 def _bar(value, lo, hi, width=18) -> str:
     pct = (value - lo) / (hi - lo) if hi > lo else 0.5
     pct = max(0.0, min(1.0, pct))
     filled = int(pct * width)
     return f"[{'█'*filled}{'░'*(width-filled)}]"
-
 
 def _make_rival_ias():
     pool = list(POKEMON_DB)
@@ -37,7 +34,6 @@ def _make_rival_ias():
         HeuristicAI(t2, t2[0]),
         MinimaxAI(t3, t3[0], enemy_team=t3),
     ]
-
 
 def _print_header(args):
     print(f"\n{BLD}{'='*60}{RST}")
@@ -53,13 +49,11 @@ def _print_header(args):
     print(f"  Log en         : {LOG_PATH}")
     print(f"{BLD}{'='*60}{RST}\n")
 
-
 def _print_gen_table_header():
     print(f"  {'Gen':>4}  {'Mejor':>8}  {'Prom':>8}  {'Peor':>8}  "
           f"{'Mejora':>7}  {'Tiempo':>7}")
     print(f"  {'----':>4}  {'--------':>8}  {'--------':>8}  {'--------':>8}  "
           f"{'-------':>7}  {'-------':>7}")
-
 
 def _print_gen_row(gen, best, avg, worst, prev_best, elapsed):
     delta  = best - prev_best
@@ -69,7 +63,6 @@ def _print_gen_row(gen, best, avg, worst, prev_best, elapsed):
     t_str  = f"{elapsed:.1f}s"
     print(f"  {gen:>4}  {best:>8.2f}  {avg:>8.2f}  {worst:>8.2f}  "
           f"{d_str:>16}  {t_str:>7}")
-
 
 def _print_best_genome(cfg: dict):
     print(f"\n{BLD}  Mejor individuo:{RST}")
@@ -96,7 +89,6 @@ def _print_best_genome(cfg: dict):
         bar = _bar(v, lo, hi)
         print(f"    {label:<28} {bar} {v:>8.3f}")
 
-
 def main():
     parser = argparse.ArgumentParser(description="Entrenamiento IA Nivel 4 (GA)")
     parser.add_argument("--gen",      type=int,   default=30)
@@ -107,16 +99,13 @@ def main():
     parser.add_argument("--tour-k",   type=int,   default=3,    dest="tour_k")
     parser.add_argument("--fresh",    action="store_true")
     args = parser.parse_args()
-
     _print_header(args)
-
     seed_cfg   = None if args.fresh else load_config()
     if seed_cfg == DEFAULT:
         seed_cfg = None
-
     rival_ias  = _make_rival_ias()
     log        = []
-    prev_best  = [None]  # lista para poder mutar en closure
+    prev_best  = [None]  
     gen_times  = []
 
     def fitness_fn(genome):
@@ -136,7 +125,6 @@ def main():
         prev_best[0] = best
         gen_times.append(elapsed)
 
-        # Guardar en log
         log.append({
             "gen":   gen,
             "best":  round(best,  4),
@@ -148,9 +136,7 @@ def main():
         os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
         with open(LOG_PATH, "w") as f:
             json.dump(log, f, indent=2)
-
     on_generation._t0 = time.time()
-
     best_cfg = run_ga(
         fitness_fn        = fitness_fn,
         population_size   = args.pop,
@@ -162,9 +148,7 @@ def main():
         checkpoint_path   = _DATA_PATH,
         on_generation     = on_generation,
     )
-
     save_config(best_cfg, _DATA_PATH)
-
     total = sum(gen_times)
     print(f"\n{BLD}{'='*60}{RST}")
     print(f"{GRN}{BLD}  ✅ Entrenamiento completado{RST}")
@@ -174,7 +158,6 @@ def main():
     print(f"  Log guardado   : {LOG_PATH}")
     _print_best_genome(best_cfg)
     print(f"{BLD}{'='*60}{RST}\n")
-
 
 if __name__ == "__main__":
     main()

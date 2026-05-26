@@ -1,0 +1,101 @@
+{
+  "total_batallas": 11,
+  "total_turnos": 113,
+  "usa_ataques": 102,
+  "usa_cambios": 4,
+  "usa_estado": 7,
+  "cambios_por_ventaja_tipo": 1,
+  "victorias_jugador": 8,
+  "agresividad": 0.889,
+  "tipo_jugador": "ofensivo",
+  "historial": [
+    {
+      "turnos": 11,
+      "usa_ataques": 11,
+      "usa_cambios": 0,
+      "uso_estado": 0,
+      "cambios_por_ventaja": 0,
+      "gano": true
+    },
+    {
+      "turnos": 5,
+      "usa_ataques": 5,
+      "usa_cambios": 0,
+      "uso_estado": 0,
+      "cambios_por_ventaja": 0,
+      "gano": true
+    },
+    {
+      "turnos": 13,
+      "usa_ataques": 12,
+      "usa_cambios": 0,
+      "uso_estado": 1,
+      "cambios_por_ventaja": 0,
+      "gano": true
+    },
+    {
+      "turnos": 26,
+      "usa_ataques": 23,
+      "usa_cambios": 0,
+      "uso_estado": 3,
+      "cambios_por_ventaja": 0,
+      "gano": false
+    },
+    {
+      "turnos": 10,
+      "usa_ataques": 9,
+      "usa_cambios": 0,
+      "uso_estado": 1,
+      "cambios_por_ventaja": 0,
+      "gano": true
+    },
+    {
+      "turnos": 8,
+      "usa_ataques": 7,
+      "usa_cambios": 0,
+      "uso_estado": 1,
+      "cambios_por_ventaja": 0,
+      "gano": true
+    },
+    {
+      "turnos": 10,
+      "usa_ataques": 9,
+      "usa_cambios": 1,
+      "uso_estado": 0,
+      "cambios_por_ventaja": 0,
+      "gano": true
+    },
+    {
+      "turnos": 5,
+      "usa_ataques": 5,
+      "usa_cambios": 0,
+      "uso_estado": 0,
+      "cambios_por_ventaja": 0,
+      "gano": false
+    },
+    {
+      "turnos": 7,
+      "usa_ataques": 5,
+      "usa_cambios": 1,
+      "uso_estado": 1,
+      "cambios_por_ventaja": 0,
+      "gano": false
+    },
+    {
+      "turnos": 7,
+      "usa_ataques": 6,
+      "usa_cambios": 1,
+      "uso_estado": 0,
+      "cambios_por_ventaja": 0,
+      "gano": true
+    },
+    {
+      "turnos": 11,
+      "usa_ataques": 10,
+      "usa_cambios": 1,
+      "uso_estado": 0,
+      "cambios_por_ventaja": 1,
+      "gano": true
+    }
+  ]
+}

@@ -11,16 +11,16 @@ def evaluate(genome: list, rival_ias: list,
     ia4  = MinimaxAI4([], None, cfg=cfg)
 
     total_score = 0.0
-    weights     = [0.2, 0.3, 0.5]  # más peso al rival más difícil
+    #Peso Rival
+    weights     = [0.2, 0.3, 0.5]  
 
     for rival, w in zip(rival_ias, weights):
         stats = run_matches(ia4, rival,
                             n=matches_per_rival,
                             team_size=team_size)
-        # Fitness: win_rate domina, HP es desempate, pocas turns bonus
         score  = stats["win_rate"]  * 100.0
         score += stats["avg_hp"]    *  30.0
-        score -= stats["avg_turns"] *   0.1  # eficiencia
+        score -= stats["avg_turns"] *   0.1  
         total_score += score * w
 
     return total_score

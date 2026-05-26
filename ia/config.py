@@ -26,9 +26,7 @@ _DATA_PATH = os.path.join(
     "data", "best_config.json"
 )
 
-
 def load_config(path: str = _DATA_PATH) -> dict:
-    """Carga config entrenada o devuelve DEFAULT si no existe."""
     if os.path.exists(path):
         try:
             with open(path, "r") as f:
@@ -41,22 +39,16 @@ def load_config(path: str = _DATA_PATH) -> dict:
             pass
     return dict(DEFAULT)
 
-
 def save_config(cfg: dict, path: str = _DATA_PATH) -> None:
-    """Guarda config en best_config.json."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         json.dump(cfg, f, indent=2)
 
-
 def cfg_to_genome(cfg: dict) -> list:
-    """Convierte config a lista de floats (genoma)."""
     keys = [k for k in DEFAULT]
     return [float(cfg.get(k, DEFAULT[k])) for k in keys]
 
-
 def genome_to_cfg(genome: list) -> dict:
-    """Convierte genoma a dict de config."""
     keys = list(DEFAULT.keys())
     cfg  = {}
     for i, k in enumerate(keys):
@@ -64,7 +56,6 @@ def genome_to_cfg(genome: list) -> dict:
         cfg[k] = v
     cfg["depth"] = max(1, min(5, int(round(cfg["depth"]))))
     return cfg
-
 
 GENOME_KEYS   = list(DEFAULT.keys())
 GENOME_BOUNDS = {

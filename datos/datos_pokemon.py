@@ -49,7 +49,7 @@ POKEMON_DB = [
         {"nombre":"Cascada","tipo":"Agua","categoria":"Fisico","poder":80,"precision":1.0,"efecto":"20% retroceso","pp":15,"ppMax":15},
         {"nombre":"Terremoto","tipo":"Tierra","categoria":"Fisico","poder":100,"precision":1.0,"efecto":"Golpea a todos","pp":10,"ppMax":10},
         {"nombre":"Trampa Rocas","tipo":"Roca","categoria":"Estado","poder":0,"precision":1.0,"efecto":"Daño al cambiar rival","pp":20,"ppMax":20},
-        {"nombre":"Avalancha","tipo":"Hielo","categoria":"Fisico","poder":60,"precision":1.0,"efecto":"30% retroceso","pp":10,"ppMax":10},
+        {"nombre":"Avalancha","tipo":"Roca","categoria":"Fisico","poder":60,"precision":1.0,"efecto":"30% retroceso","pp":10,"ppMax":10},
         {"nombre":"Abocajarro","tipo":"Lucha","categoria":"Fisico","poder":85,"precision":1.0,"efecto":"10% bajar Defensa","pp":15,"ppMax":15},
         {"nombre":"Toxico","tipo":"Veneno","categoria":"Estado","poder":0,"precision":0.9,"efecto":"Veneno grave","pp":10,"ppMax":10},
         {"nombre":"Sustituto","tipo":"Normal","categoria":"Estado","poder":0,"precision":1.0,"efecto":"Crea un sustituto con 1/4 de HP","pp":10,"ppMax":10},

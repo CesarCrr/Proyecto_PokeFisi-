@@ -48,7 +48,6 @@ class PokemonApp:
         self.current_scene = None
         self._show_menu()
 
-    #Escenas 
     def _show_menu(self):
         play_menu()
         self.current_scene = PokemonMenu(self.screen, self._start_battle)
@@ -71,7 +70,6 @@ class PokemonApp:
                 on_exit_callback=self._show_menu,
             )
             
-    #Pantalla completa
     def _toggle_fullscreen(self):
         self._fullscreen = not self._fullscreen
         if self._fullscreen:
@@ -80,8 +78,8 @@ class PokemonApp:
         else:
             self.screen = pygame.display.set_mode(
                 (BASE_W, BASE_H), pygame.RESIZABLE)
-        pygame.display.flip()  # forzar que pygame actualice el tamaño real
-        W, H = self.screen.get_size()  # leer tamaño real DESPUÉS del flip
+        pygame.display.flip()  
+        W, H = self.screen.get_size() 
         if self.current_scene:
             self.current_scene.screen = self.screen
             self.current_scene.W = W
@@ -97,7 +95,6 @@ class PokemonApp:
                 if hasattr(self.current_scene, '_refresh_ui'):
                     self.current_scene._refresh_ui()
 
-    # ── Loop principal ────────────────────────────────────────────────────
     def run(self):
         while True:
             for event in pygame.event.get():
@@ -105,18 +102,14 @@ class PokemonApp:
                     pygame.quit()
                     sys.exit()
 
-                # F11 → pantalla completa / ventana
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
                     self._toggle_fullscreen()
                     continue
 
-                # Redimensión de ventana (usuario arrastra bordes o maximiza)
                 if event.type == pygame.VIDEORESIZE:
-                    # En modo ventana normal actualizamos el tamaño
                     if not self._fullscreen:
                         self.screen = pygame.display.set_mode(
                             (event.w, event.h), pygame.RESIZABLE)
-                    # Notificar a la escena
                     if self.current_scene:
                         self.current_scene.screen = self.screen
                         self.current_scene.W = event.w
