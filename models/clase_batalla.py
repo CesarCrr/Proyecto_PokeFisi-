@@ -80,6 +80,8 @@ class BattlePokemon:
         
         self.substitute = False
         self.sub_hp = 0
+
+        self.mega_evolved = False
         
         self.flying_turns = 0
         self.flying_move = None
@@ -106,6 +108,8 @@ class BattlePokemon:
         
         if stat == "atk":
             base = self.atk
+            if self.status == "burn":
+                base = int(base * 0.5)  # Quemado: el Ataque baja a la mitad
         elif stat == "def":
             base = self.defensa
         elif stat == "spe":
@@ -117,17 +121,12 @@ class BattlePokemon:
 
     def apply_damage(self, damage, ignore_substitute=False):
         if self.substitute and not ignore_substitute:
-            if self.sub_hp >= damage:
-                self.sub_hp -= damage
-                return False
-            else:
-                damage_remaining = damage - self.sub_hp
+            # El muñeco recibe todo el daño; el Pokemon recibe 0
+            self.sub_hp -= damage
+            if self.sub_hp <= 0:
                 self.substitute = False
                 self.sub_hp = 0
-                self.current_hp = clamp(self.current_hp - damage_remaining, 0, self.max_hp)
-                if self.current_hp <= 0:
-                    self.fainted = True
-                return True
+            return False
         else:
             self.current_hp = clamp(self.current_hp - damage, 0, self.max_hp)
             if self.current_hp <= 0:
@@ -138,11 +137,24 @@ class BattlePokemon:
         self.current_hp = clamp(self.current_hp + amount, 0, self.max_hp)
 
     def create_substitute(self):
-        if not self.substitute:
+        cost = max(1, self.max_hp // 4)
+        if not self.substitute and self.current_hp > cost:
+            self.current_hp -= cost
             self.substitute = True
-            self.sub_hp = max(1, self.max_hp // 4)
+            self.sub_hp = cost
             return True
         return False
+
+    def mega_evolve(self):
+        if self.mega_evolved or self.nombre != "Pikachu":
+            return False
+        self.mega_evolved = True
+        self.max_hp     += 100
+        self.current_hp += 100
+        self.atk        += 150
+        self.defensa    += 100
+        self.spe        += 150
+        return True
 
     def get_hp_percent(self):
         return (self.current_hp / self.max_hp) * 100

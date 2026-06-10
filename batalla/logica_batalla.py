@@ -27,9 +27,8 @@ def calculate_damage(attacker, defender, move):
         defense = defender.get_effective_stat("def")
     type_mult = get_type_multiplier(move["tipo"], defender.tipo1, defender.tipo2)
     base_damage = (atk / defense) * move["poder"]
+    # El Ataque ya viene reducido a la mitad por quemadura (get_effective_stat)
     damage = max(1, int(base_damage * type_mult))
-    if attacker.status == "burn" and move["categoria"] == "Fisico":
-        damage = int(damage * 0.5)
     return damage, type_mult
 
 def calculate_special_damage(attacker, defender, move):
@@ -50,8 +49,6 @@ def calculate_special_damage(attacker, defender, move):
     type_mult = get_type_multiplier(move["tipo"], defender.tipo1, defender.tipo2)
     base_damage = (atk_stat / def_stat) * power
     damage = max(1, int(base_damage * type_mult))
-    if attacker.status == "burn" and move["categoria"] == "Fisico":
-        damage = int(damage * 0.5)
     return damage, type_mult
 
 def get_priority(move_idx, pokemon):

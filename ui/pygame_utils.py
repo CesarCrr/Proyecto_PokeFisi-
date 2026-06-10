@@ -95,6 +95,8 @@ def get_font(size: int, bold: bool = False, classic: bool = False) -> pygame.fon
         if classic and os.path.exists(_FONT_PATH):
             try:
                 f = pygame.font.Font(_FONT_PATH, size)
+                if bold:
+                    f.set_bold(True)
                 _font_cache[key] = f
                 return f
             except Exception:
@@ -222,22 +224,29 @@ def _process_gif_frames(path: str, size: tuple) -> list:
 def load_gif_frames_with_cache(path: str, size: tuple) -> list:
     cache_key = hashlib.md5(f"{path}_{size[0]}_{size[1]}".encode()).hexdigest()
     cache_file = os.path.join(_CACHE_DIR, f"gif_{cache_key}.pickle")
-    
+
+    # Las Surfaces de pygame no son picklables: se guardan como bytes RGBA
     if os.path.exists(cache_file):
         try:
             with open(cache_file, 'rb') as f:
-                return pickle.load(f)
+                raw_frames = pickle.load(f)
+            if raw_frames:  # caché vacía = procesamiento fallido: reintentar
+                return [(pygame.image.fromstring(raw, fsize, "RGBA"), dur)
+                        for raw, fsize, dur in raw_frames]
+        except Exception:
+            pass  # caché corrupta o de formato viejo: reprocesar
+
+    frames = _process_gif_frames(path, size)
+
+    if frames:
+        try:
+            raw_frames = [(pygame.image.tostring(surf, "RGBA"), surf.get_size(), dur)
+                          for surf, dur in frames]
+            with open(cache_file, 'wb') as f:
+                pickle.dump(raw_frames, f)
         except Exception:
             pass
-    
-    frames = _process_gif_frames(path, size)
-    
-    try:
-        with open(cache_file, 'wb') as f:
-            pickle.dump(frames, f)
-    except Exception:
-        pass
-    
+
     return frames
 
 class GifSprite:
@@ -315,7 +324,16 @@ def get_preloaded_gif(name: str, target_size: tuple = None) -> 'GifSprite':
     
     if cache_key in _global_preloaded_gifs:
         return _global_preloaded_gifs[cache_key]
-    
+
+    # Mega Pikachu vive en su propia carpeta, fuera de Gif_Pokemon
+    if name_lower in ("mega_pikachu", "mega pikachu"):
+        mega_path = os.path.join(_BASE_DIR, "images", "Mega_Pikachu", "Mega_Pikachu.gif")
+        if os.path.exists(mega_path):
+            gif = load_pokemon_gif(mega_path, target_size)
+            _global_preloaded_gifs[cache_key] = gif
+            return gif
+        return None
+
     gif_dir = os.path.join(_BASE_DIR, "images", "Gif_Pokemon")
     if not os.path.exists(gif_dir):
         return None

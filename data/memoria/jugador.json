@@ -1,30 +1,14 @@
 {
-  "total_batallas": 12,
-  "total_turnos": 123,
-  "usa_ataques": 111,
-  "usa_cambios": 4,
-  "usa_estado": 8,
+  "total_batallas": 22,
+  "total_turnos": 254,
+  "usa_ataques": 229,
+  "usa_cambios": 8,
+  "usa_estado": 17,
   "cambios_por_ventaja_tipo": 1,
-  "victorias_jugador": 9,
-  "agresividad": 0.891,
+  "victorias_jugador": 14,
+  "agresividad": 0.843,
   "tipo_jugador": "ofensivo",
   "historial": [
-    {
-      "turnos": 11,
-      "usa_ataques": 11,
-      "usa_cambios": 0,
-      "uso_estado": 0,
-      "cambios_por_ventaja": 0,
-      "gano": true
-    },
-    {
-      "turnos": 5,
-      "usa_ataques": 5,
-      "usa_cambios": 0,
-      "uso_estado": 0,
-      "cambios_por_ventaja": 0,
-      "gano": true
-    },
     {
       "turnos": 13,
       "usa_ataques": 12,
@@ -104,6 +88,86 @@
       "uso_estado": 1,
       "cambios_por_ventaja": 0,
       "gano": true
+    },
+    {
+      "turnos": 9,
+      "usa_ataques": 9,
+      "usa_cambios": 0,
+      "uso_estado": 0,
+      "cambios_por_ventaja": 0,
+      "gano": true
+    },
+    {
+      "turnos": 14,
+      "usa_ataques": 13,
+      "usa_cambios": 0,
+      "uso_estado": 1,
+      "cambios_por_ventaja": 0,
+      "gano": false
+    },
+    {
+      "turnos": 23,
+      "usa_ataques": 22,
+      "usa_cambios": 0,
+      "uso_estado": 1,
+      "cambios_por_ventaja": 0,
+      "gano": true
+    },
+    {
+      "turnos": 9,
+      "usa_ataques": 8,
+      "usa_cambios": 0,
+      "uso_estado": 1,
+      "cambios_por_ventaja": 0,
+      "gano": true
+    },
+    {
+      "turnos": 8,
+      "usa_ataques": 7,
+      "usa_cambios": 1,
+      "uso_estado": 0,
+      "cambios_por_ventaja": 0,
+      "gano": true
+    },
+    {
+      "turnos": 18,
+      "usa_ataques": 17,
+      "usa_cambios": 1,
+      "uso_estado": 0,
+      "cambios_por_ventaja": 0,
+      "gano": false
+    },
+    {
+      "turnos": 22,
+      "usa_ataques": 21,
+      "usa_cambios": 1,
+      "uso_estado": 0,
+      "cambios_por_ventaja": 0,
+      "gano": false
+    },
+    {
+      "turnos": 9,
+      "usa_ataques": 8,
+      "usa_cambios": 0,
+      "uso_estado": 1,
+      "cambios_por_ventaja": 0,
+      "gano": false
+    },
+    {
+      "turnos": 12,
+      "usa_ataques": 9,
+      "usa_cambios": 1,
+      "uso_estado": 2,
+      "cambios_por_ventaja": 0,
+      "gano": true
+    },
+    {
+      "turnos": 7,
+      "usa_ataques": 4,
+      "usa_cambios": 0,
+      "uso_estado": 3,
+      "cambios_por_ventaja": 0,
+      "gano": false
     }
   ]
 }

@@ -1,18 +1,18 @@
 {
   "ia1": {
-    "victorias": 6,
-    "derrotas": 52
+    "victorias": 11,
+    "derrotas": 87
   },
   "ia2": {
     "victorias": 16,
     "derrotas": 16
   },
   "ia3": {
-    "victorias": 25,
-    "derrotas": 22
+    "victorias": 33,
+    "derrotas": 27
   },
   "ia4": {
-    "victorias": 98,
-    "derrotas": 74
+    "victorias": 142,
+    "derrotas": 92
   }
 }

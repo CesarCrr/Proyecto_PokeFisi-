@@ -185,6 +185,10 @@ class PokemonGUI:
         self.cuadro_y   = cuadro_top
         self.rect_cuadro = pygame.Rect(margin, cuadro_top, cuadro_w, cuadro_h)
 
+        mb_w = max(180, int(cuadro_w * 0.24))
+        mb_h = 32
+        self.rect_mega_btn = pygame.Rect(margin + 8, cuadro_top - mb_h - 48, mb_w, mb_h)
+
         sprite_zone_h = max(80, cuadro_top - vida_bottom - 2)
         self.sprite_h = sprite_zone_h
         self.rect_sprite_zone = pygame.Rect(0, vida_bottom, W, sprite_zone_h)
@@ -218,20 +222,20 @@ class PokemonGUI:
 
         ci    = self.cuadro_inner
         tab_h = max(26, int(ci.height * 0.28))
-        tab_w = ci.width // 2 - 4
-        self.rect_tab_moves  = pygame.Rect(ci.x,           ci.y, tab_w, tab_h)
-        self.rect_tab_switch = pygame.Rect(ci.x+tab_w+8,   ci.y, tab_w, tab_h)
+        tab_w = ci.width // 2 - 19  # ancho reducido
+        self.rect_tab_moves  = pygame.Rect(ci.x + 15,         ci.y, tab_w, tab_h)
+        self.rect_tab_switch = pygame.Rect(ci.x+15+tab_w+8,   ci.y, tab_w - 5, tab_h)
 
         act_y = ci.y + tab_h + 4
         act_h = ci.height - tab_h - 6
         self.rect_action = pygame.Rect(ci.x, act_y, ci.width, act_h)
 
-        bw = ci.width // 2 - 4
+        bw = ci.width // 2 - 24  # ancho reducido para no pegar con el marco
         bh = max(32, (act_h - 4) // 2)
         self.move_buttons   = []
         self.switch_buttons = []
         for i in range(4):
-            rx = self.rect_action.x + (i%2)*(bw+8)
+            rx = self.rect_action.x + 15 + (i%2)*(bw+8)
             ry = self.rect_action.y + (i//2)*(bh+4)
             r  = pygame.Rect(rx, ry, bw, bh)
             self.move_buttons.append(
@@ -239,7 +243,9 @@ class PokemonGUI:
             self.switch_buttons.append(
                 Button(r, "", pkm_font(10), tag=i, text_align="left"))
 
-        self.log = TextLog(self.rect_action, pkm_font(11), fg=PKM_BLACK)
+        log_rect = pygame.Rect(self.rect_action.x + 5, self.rect_action.y,
+                               self.rect_action.width - 5, self.rect_action.height)
+        self.log = TextLog(log_rect, pkm_font(11), fg=PKM_BLACK)
         self.log.line_h = pkm_font(11).get_height() + 5
 
     def _start_new_game(self):
@@ -296,6 +302,16 @@ class PokemonGUI:
             pygame.Rect(ci.x+4+2*(bw3+4), bot_y, bw3, 32),
             "Iniciar" if last else "Siguiente", f, tag="siguiente",
             text_align="left"))
+        self._build_menu_btn(ci, f)
+
+    def _build_menu_btn(self, ci, f):
+        # Botón para regresar al menú principal (esquina superior derecha)
+        lbl  = "Volver al menu"
+        mb_w = f.size("> " + lbl)[0] + 14
+        mb_h = f.get_height() + 10
+        self._menu_btn = Button(
+            pygame.Rect(ci.right - mb_w - 4, ci.y + 2, mb_w, mb_h),
+            lbl, f, tag="volver_menu", text_align="left")
 
     def _build_move_sel_buttons(self, idx):
         pokemon = self.pokemon_data_list[idx]
@@ -324,6 +340,7 @@ class PokemonGUI:
             pygame.Rect(ci.x+4+2*(bw3+4), bot_y, bw3, 24),
             "Iniciar" if last else "Siguiente", f, tag="siguiente",
             text_align="left"))
+        self._build_menu_btn(ci, f)
 
     def handle_event(self, event):
         if event.type == pygame.VIDEORESIZE:
@@ -365,7 +382,13 @@ class PokemonGUI:
         if self.state == self.STATE_MOVE_SEL_INIT:
             for btn in self._move_sel_btns:
                 btn.update_hover(mouse)
+            if hasattr(self, '_menu_btn'):
+                self._menu_btn.update_hover(mouse)
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if hasattr(self, '_menu_btn') and self._menu_btn.handle_event(event):
+                    if self.on_exit_callback:
+                        self.on_exit_callback()
+                    return
                 for btn in self._move_sel_btns:
                     if btn.handle_event(event):
                         t = btn.tag
@@ -391,6 +414,12 @@ class PokemonGUI:
                     if btn.handle_event(event):
                         self._on_go_click(btn.tag)
             return
+
+        # Botón Megaevolucionar
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._player_can_mega() and self.rect_mega_btn.collidepoint(event.pos):
+                self._mega_evolve_player()
+                return
 
         # Tabs
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -573,7 +602,7 @@ class PokemonGUI:
         y0  = ci.y + 28
         btns = []
         for i, (label, tag) in enumerate(options):
-            r = pygame.Rect(ci.x+4, y0+i*(bh+gap), ci.width-8, bh)
+            r = pygame.Rect(ci.x+9, y0+i*(bh+gap), ci.width-18, bh)
             btns.append(Button(r, label, f, tag=tag, text_align="left"))
         self._dialog = {"title": title, "buttons": btns, "callback": None}
         return btns
@@ -929,12 +958,26 @@ class PokemonGUI:
             damage, type_mult = calculate_damage(atacante, defensor, move)
             if rand(0.0625):
                 damage = int(damage*1.5); log_lines.append("[CRITICO] Golpe critico!")
-            defensor.current_hp = max(0, defensor.current_hp - damage)
-            murio = (defensor.current_hp <= 0)
-            if type_mult >= 2:   log_lines.append(f"Es muy efectivo! (x{type_mult})")
-            elif type_mult == 0: log_lines.append(f"No afecta a {defensor.nombre}!"); defensor.current_hp=min(defensor.max_hp,defensor.current_hp+damage); murio=False
-            elif type_mult < 1:  log_lines.append(f"No es muy efectivo... (x{type_mult})")
-            log_lines.append(f"{defensor.nombre} baja {damage} de vida.")
+            murio = False
+            if type_mult == 0:
+                log_lines.append(f"No afecta a {defensor.nombre}!")
+            elif defensor.substitute:
+                # El muñeco recibe todo el daño; el Pokemon recibe 0
+                if type_mult >= 2:  log_lines.append(f"Es muy efectivo! (x{type_mult})")
+                elif type_mult < 1: log_lines.append(f"No es muy efectivo... (x{type_mult})")
+                defensor.sub_hp -= damage
+                if defensor.sub_hp <= 0:
+                    defensor.substitute = False
+                    defensor.sub_hp = 0
+                    log_lines.append(f"¡El sustituto recibió el golpe y se rompió! ¡{defensor.nombre} salió de nuevo!")
+                else:
+                    log_lines.append(f"¡El sustituto de {defensor.nombre} recibió el golpe! (Le quedan {defensor.sub_hp} HP)")
+            else:
+                defensor.current_hp = max(0, defensor.current_hp - damage)
+                murio = (defensor.current_hp <= 0)
+                if type_mult >= 2:  log_lines.append(f"Es muy efectivo! (x{type_mult})")
+                elif type_mult < 1: log_lines.append(f"No es muy efectivo... (x{type_mult})")
+                log_lines.append(f"{defensor.nombre} baja {damage} de vida.")
             if move["nombre"] in ["Gigadrenado","Puno Drenaje"]:
                 d=int(damage*0.5); atacante.heal(d); log_lines.append(f"[CURACION] {atacante.nombre} absorbe {d} HP!")
             if move["nombre"]=="Pajaro Osado":
@@ -1290,7 +1333,33 @@ class PokemonGUI:
             btn.text=f"{star}{p.nombre}  {faint}"
             btn.disabled=dis
 
+    def _player_can_mega(self):
+        if not self.player_team or self._game_over_active:
+            return False
+        pp = self.player_team[self.player_active_idx]
+        return (pp.nombre == "Pikachu" and not pp.mega_evolved and not pp.fainted
+                and self.state == self.STATE_MOVE_SELECT
+                and not self.buttons_locked and not self._dialog
+                and not self.pending_switch)
+
+    def _mega_evolve_player(self):
+        pp = self.player_team[self.player_active_idx]
+        if pp.mega_evolve():
+            self._log_msg(f"[MEGA] ¡Tu Pikachu megaevolucionó a Mega Pikachu!", PKM_GOLD)
+            self._sync_hp_on_switch()
+            self._refresh_ui()
+
+    def _auto_mega_ia(self):
+        if not self.ai_team or not self.player_team or self._game_over_active:
+            return
+        ap = self.ai_team[self.ai_active_idx]
+        if ap.nombre == "Pikachu" and not ap.mega_evolved and not ap.fainted:
+            ap.mega_evolve()
+            self._log_msg("[MEGA] ¡El Pikachu rival megaevolucionó a Mega Pikachu!", PKM_GOLD)
+            self._sync_hp_on_switch()
+
     def update(self):
+        self._auto_mega_ia()
         self._tick_log_lines()
         for key in ("player","ai"):
             a = self._hp_anim[key]
@@ -1312,11 +1381,16 @@ class PokemonGUI:
             self._draw_move_selection_full()
             return
 
-        self._draw_vida_panels()
-
+        # Sprites primero: si un GIF grande invade la zona del panel de vida,
+        # debe quedar por debajo de este
         self._draw_sprites()
 
+        self._draw_vida_panels()
+
         self._draw_cuadro_base()
+
+        if self._player_can_mega():
+            self._draw_mega_button()
 
         if self._dialog:
             self._draw_dialog_in_cuadro()
@@ -1459,15 +1533,35 @@ class PokemonGUI:
         ap = self.ai_team[self.ai_active_idx]
 
         for poke, rect, do_flip in [
-            (pp, self.rect_sprite_player, True),   
+            (pp, self.rect_sprite_player, True),
             (ap, self.rect_sprite_ai,     False)
         ]:
-            gif = self._get_poke_gif(poke.nombre)
+            if getattr(poke, 'mega_evolved', False):
+                gif = self._get_poke_gif("Mega_Pikachu")
+            else:
+                gif = self._get_poke_gif(poke.nombre)
             img = gif.get_frame() if gif and gif.is_valid() else None
             if img:
                 iw, ih = img.get_size()
                 scale = min(rect.width / iw, rect.height / ih)
-                nw, nh = int(iw * scale), int(ih * scale)
+                base_nh = max(1, int(ih * scale))
+                if poke.nombre == "Pikachu" and not getattr(poke, 'mega_evolved', False):
+                    scale *= 0.5  # Pikachu es pequeño: 1/2 del tamaño estándar
+                elif poke.nombre == "Sylveon":
+                    scale *= 0.6  # Sylveon: pequeño
+                elif poke.nombre == "Mimikyu":
+                    scale *= 0.75  # Mimikyu: mediano
+                elif poke.nombre in ("Lucario", "Blaziken"):
+                    scale *= 0.88  # Lucario y Blaziken: mismo tamaño
+                elif poke.nombre in ("Groudon", "Kyogre", "Rayquaza"):
+                    scale *= 1.2  # Legendarios: más grandes (quedan bajo el panel de vida)
+                # px extra de altura por especie, proporcional
+                extra_h = {"Kyogre": 15, "Rayquaza": 10, "Groudon": 3,
+                           "Tyranitar": 5, "Gyarados": 8}.get(poke.nombre, 0)
+                if extra_h:
+                    cur_h  = max(1, int(ih * scale))
+                    scale *= (cur_h + extra_h) / cur_h
+                nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
                 if img.get_flags() & pygame.SRCALPHA:
                     scaled = pygame.transform.smoothscale(img, (nw, nh))
                 else:
@@ -1475,7 +1569,11 @@ class PokemonGUI:
                 if do_flip:
                     scaled = pygame.transform.flip(scaled, True, False)
                 ix = rect.x + (rect.width - nw) // 2
-                iy = rect.y + (rect.height - nh) // 2
+                if nh > base_nh:
+                    # Agrandado: crecer centrado para que no se vea más arriba
+                    iy = rect.y + (rect.height - nh) // 2
+                else:
+                    iy = rect.y + (rect.height - base_nh) // 2 + (base_nh - nh)
 
                 hp_key = "player" if poke == self.player_team[self.player_active_idx] else "ai"
                 hp_anim_done = self._hp_anim[hp_key]["cur"] <= 0.001
@@ -1498,48 +1596,62 @@ class PokemonGUI:
         pygame.draw.rect(self.screen, (60,60,180), bg_r, 1, border_radius=4)
         self.screen.blit(turn_surf, (turn_x, turn_y))
         
+    def _draw_mega_button(self):
+        r = self.rect_mega_btn
+        hov = r.collidepoint(pygame.mouse.get_pos())
+        bg = (255, 230, 110) if hov else (247, 208, 44)
+        pygame.draw.rect(self.screen, bg, r, border_radius=6)
+        pygame.draw.rect(self.screen, PKM_BLACK, r, 2, border_radius=6)
+        f = pkm_font(11)
+        txt = f.render("Megaevolucionar", True, PKM_BLACK)
+        self.screen.blit(txt, txt.get_rect(center=r.center))
+
     def _draw_action_or_log(self):
         ci = self.cuadro_inner
         f_tab = pkm_font(11)
 
-        tab_col_m  = PKM_BLACK if self.active_tab=="moves"  else (120,120,120)
-        tab_col_s  = PKM_BLACK if self.active_tab=="switch" else (120,120,120)
-        draw_text(self.screen, "Ataques", self.rect_tab_moves.centerx,
-                  self.rect_tab_moves.y+3, f_tab, tab_col_m, center=True)
-        draw_text(self.screen, "Cambiar", self.rect_tab_switch.centerx,
-                  self.rect_tab_switch.y+3, f_tab, tab_col_s, center=True)
-
-        if self.active_tab=="moves":
-            pygame.draw.line(self.screen, PKM_BLACK,
-                             (self.rect_tab_moves.x, self.rect_tab_moves.bottom-1),
-                             (self.rect_tab_moves.right, self.rect_tab_moves.bottom-1), 2)
-        else:
-            pygame.draw.line(self.screen, PKM_BLACK,
-                             (self.rect_tab_switch.x, self.rect_tab_switch.bottom-1),
-                             (self.rect_tab_switch.right, self.rect_tab_switch.bottom-1), 2)
+        # Pestañas con recuadro: Ataques en rojo, Cambiar en azul
+        for rect, label, col, active in [
+            (self.rect_tab_moves,  "Ataques", PKM_RED,  self.active_tab=="moves"),
+            (self.rect_tab_switch, "Cambiar", PKM_BLUE, self.active_tab=="switch"),
+        ]:
+            draw_rect_alpha(self.screen, col, rect, alpha=170 if active else 60, radius=4)
+            pygame.draw.rect(self.screen, col, rect, 2, border_radius=4)
+            txt_col = WHITE if active else PKM_BLACK
+            draw_text(self.screen, label, rect.centerx,
+                      rect.y + (rect.height - f_tab.get_height())//2,
+                      f_tab, txt_col, center=True)
 
         if self.state in (self.STATE_WAITING, self.STATE_CONTINUE):
             self.log.draw(self.screen)
             if self.state == self.STATE_CONTINUE:
                 f_cont = pkm_font(14)
                 txt = f_cont.render("[ Clic / Enter / Espacio para continuar ]", True, (60,60,180))
-                r = txt.get_rect(midbottom=(self.W//2, self.H - 8))
+                r = txt.get_rect(midbottom=(self.W//2, self.rect_cuadro.y - 8))
                 pygame.draw.rect(self.screen, (220,220,240), r.inflate(12,6), border_radius=4)
                 pygame.draw.rect(self.screen, (60,60,180), r.inflate(12,6), 2, border_radius=4)
                 self.screen.blit(txt, r)
         else:
             btns = self.move_buttons if self.active_tab=="moves" else self.switch_buttons
             f_btn = pkm_font(12)
+            pp = self.player_team[self.player_active_idx] if self.player_team else None
             for btn in btns:
+                if (self.active_tab == "moves" and pp is not None
+                        and btn.tag < len(pp.movimientos)):
+                    tipo  = pp.movimientos[btn.tag]["tipo"]
+                    tc, _ = TYPE_COLORS.get(tipo, ((100,100,100), WHITE))
+                    draw_rect_alpha(self.screen, tc, btn.rect, alpha=80, radius=2)
                 col    = (150,150,150) if btn.disabled else (SEL_COL if btn.hovered else NORM_COL)
                 cursor = "> " if btn.hovered and not btn.disabled else "  "
                 text   = cursor + btn.text
                 rendered = f_btn.render(text, True, col)
                 r = rendered.get_rect(midleft=(btn.rect.x+4, btn.rect.centery))
                 self.screen.blit(rendered, r)
+                # Línea separadora al filo del marco interior, sin pisar el contorno
+                line_y = min(btn.rect.bottom, ci.bottom - 2)
                 pygame.draw.line(self.screen, (200,200,200),
-                                 (btn.rect.x, btn.rect.bottom),
-                                 (btn.rect.right, btn.rect.bottom), 1)
+                                 (max(btn.rect.x, ci.x), line_y),
+                                 (min(btn.rect.right, ci.right), line_y), 1)
 
             if self.log.lines:
                 pass
@@ -1550,7 +1662,7 @@ class PokemonGUI:
         f_title = pkm_font(12)
         f_opt   = pkm_font(11)
 
-        draw_text(self.screen, d["title"], ci.x+6, ci.y+4, f_title, PKM_BLACK)
+        draw_text(self.screen, d["title"], ci.x+11, ci.y+4, f_title, PKM_BLACK)
 
         for btn in d["buttons"]:
             mouse = pygame.mouse.get_pos()
@@ -1561,24 +1673,29 @@ class PokemonGUI:
             rendered = f_opt.render(text, True, col)
             r = rendered.get_rect(midleft=(btn.rect.x+4, btn.rect.centery))
             self.screen.blit(rendered, r)
+            line_y = min(btn.rect.bottom, ci.bottom - 2)
             pygame.draw.line(self.screen, (200,200,200),
-                             (btn.rect.x, btn.rect.bottom),(btn.rect.right,btn.rect.bottom),1)
+                             (max(btn.rect.x, ci.x), line_y),
+                             (min(btn.rect.right, ci.right), line_y), 1)
 
     def _draw_game_over_in_cuadro(self):
         ci = self.cuadro_inner
-        f  = pkm_font(11)
+        # Mensaje de victoria/derrota en negrita, por encima del recuadro
+        f  = get_font(13, bold=True, classic=True)
         msg_surf = f.render(self._go_msg, True, self._go_col)
-        msg_x = ci.x + 6
-        msg_y = ci.y + (ci.height - msg_surf.get_height()) // 2
-        self.screen.blit(msg_surf, (msg_x, msg_y))
- 
+        r = msg_surf.get_rect(midbottom=(self.W//2, self.rect_cuadro.y - 8))
+        banner = r.inflate(16, 10)
+        pygame.draw.rect(self.screen, (245,245,245), banner, border_radius=4)
+        pygame.draw.rect(self.screen, self._go_col, banner, 2, border_radius=4)
+        self.screen.blit(msg_surf, r)
+
         if self.log and self.log.lines:
             f_log = pkm_font(9)
-            ly = msg_y + msg_surf.get_height() + 4
+            ly = ci.y + 8
             for line_text, _ in self.log.lines[-3:]:
                 if ly + f_log.get_height() > ci.bottom: break
                 ls = f_log.render(line_text, True, (60,60,60))
-                self.screen.blit(ls, (msg_x, ly))
+                self.screen.blit(ls, (ci.x + 11, ly))
                 ly += f_log.get_height() + 2
 
         f2 = pkm_font(10)
@@ -1628,4 +1745,13 @@ class PokemonGUI:
             cursor = "> " if btn.hovered and not btn.disabled else "  "
             rendered = f_opt.render(cursor+btn.text, True, col)
             r = rendered.get_rect(midleft=(btn.rect.x+4, btn.rect.centery))
+            self.screen.blit(rendered, r)
+
+        if hasattr(self, '_menu_btn'):
+            btn = self._menu_btn
+            btn.update_hover(mouse)
+            col = SEL_COL if btn.hovered else PKM_RED
+            cursor = "> " if btn.hovered else "  "
+            rendered = f_opt.render(cursor + btn.text, True, col)
+            r = rendered.get_rect(midleft=(btn.rect.x + 4, btn.rect.centery))
             self.screen.blit(rendered, r)

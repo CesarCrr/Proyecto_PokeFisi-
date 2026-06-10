@@ -25,8 +25,10 @@ class PokemonApp:
             (BASE_W, BASE_H),
             pygame.RESIZABLE
         )
+        
         self.clock       = pygame.time.Clock()
         self._fullscreen = False
+        self._maximizar_ventana()
         
         print("Iniciando PokeFisi...")
         preload_all_resources() 
@@ -47,6 +49,16 @@ class PokemonApp:
 
         self.current_scene = None
         self._show_menu()
+
+    def _maximizar_ventana(self):
+        # Maximiza la ventana conservando la barra de título (cerrar, minimizar, etc.)
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                hwnd = pygame.display.get_wm_info()["window"]
+                ctypes.windll.user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE
+            except Exception:
+                pass
 
     def _show_menu(self):
         play_menu()

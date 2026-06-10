@@ -96,12 +96,16 @@ def apply_move_effects(attacker, defender, move, log_lines, is_player_attacking,
         return
     
     if move_name == "Sustituto":
-        if not attacker.substitute:
-            attacker.substitute = True
-            attacker.sub_hp = max(1, attacker.max_hp // 4)
-            log_lines.append(f" ¡{attacker.nombre} creó un sustituto con {attacker.sub_hp} HP!")
-        else:
+        cost = max(1, attacker.max_hp // 4)
+        if attacker.substitute:
             log_lines.append(f" {attacker.nombre} ya tiene un sustituto.")
+        elif attacker.current_hp <= cost:
+            log_lines.append(f" ¡{attacker.nombre} no tiene suficiente HP para crear un sustituto!")
+        else:
+            attacker.current_hp -= cost
+            attacker.substitute = True
+            attacker.sub_hp = cost
+            log_lines.append(f" ¡{attacker.nombre} sacrificó {cost} HP y creó un sustituto con {cost} HP!")
         return
     
     if move_name == "Danza Espada":

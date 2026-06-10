@@ -181,7 +181,9 @@ class PokemonSimulationGUI:
         self.vida_inner_blue = vida_inner(self.rect_vida_blue)
         self.vida_inner_red  = vida_inner(self.rect_vida_red)
 
-        self.log = TextLog(self.cuadro_inner, pkm_font(12), fg=PKM_BLACK)
+        log_rect = pygame.Rect(self.cuadro_inner.x + 5, self.cuadro_inner.y,
+                               self.cuadro_inner.width - 5, self.cuadro_inner.height)
+        self.log = TextLog(log_rect, pkm_font(12), fg=PKM_BLACK)
 
         ci = self.cuadro_inner
         f  = pkm_font(11)
@@ -189,8 +191,8 @@ class PokemonSimulationGUI:
         bw = (ci.width - 16) // 2
         by = ci.y + ci.height - bh - 4
         self._ctrl_btns = [
-            Button(pygame.Rect(ci.x+4, by, bw, bh), "Menu Principal", f, tag="menu", text_align="left"),
-            Button(pygame.Rect(ci.x+4+bw+8, by, bw, bh), "Nueva batalla", f, tag="restart", text_align="left"),
+            Button(pygame.Rect(ci.x+14, by, bw, bh), "Menu Principal", f, tag="menu", text_align="left"),
+            Button(pygame.Rect(ci.x+14+bw+8, by, bw, bh), "Nueva batalla", f, tag="restart", text_align="left"),
         ]
         self._go_btns = []
 
@@ -505,12 +507,26 @@ class PokemonSimulationGUI:
                 self._log_lines_delayed(log_lines[:],callback); log_lines.clear(); return
             damage,type_mult=calculate_damage(atacante,defensor,move)
             if rand(0.0625): damage=int(damage*1.5); log_lines.append("[CRITICO] Golpe critico!")
-            defensor.current_hp=max(0,defensor.current_hp-damage)
-            murio=(defensor.current_hp<=0)
-            if type_mult>=2:   log_lines.append(f"Es muy efectivo! (x{type_mult})")
-            elif type_mult==0: log_lines.append(f"No afecta a {defensor.nombre}!"); defensor.current_hp=min(defensor.max_hp,defensor.current_hp+damage); murio=False
-            elif type_mult<1:  log_lines.append(f"No es muy efectivo... (x{type_mult})")
-            log_lines.append(f"{defensor.nombre} baja {damage} de vida.")
+            murio=False
+            if type_mult==0:
+                log_lines.append(f"No afecta a {defensor.nombre}!")
+            elif defensor.substitute:
+                # El muñeco recibe todo el daño; el Pokemon recibe 0
+                if type_mult>=2:  log_lines.append(f"Es muy efectivo! (x{type_mult})")
+                elif type_mult<1: log_lines.append(f"No es muy efectivo... (x{type_mult})")
+                defensor.sub_hp-=damage
+                if defensor.sub_hp<=0:
+                    defensor.substitute=False
+                    defensor.sub_hp=0
+                    log_lines.append(f"¡El sustituto recibió el golpe y se rompió! ¡{defensor.nombre} salió de nuevo!")
+                else:
+                    log_lines.append(f"¡El sustituto de {defensor.nombre} recibió el golpe! (Le quedan {defensor.sub_hp} HP)")
+            else:
+                defensor.current_hp=max(0,defensor.current_hp-damage)
+                murio=(defensor.current_hp<=0)
+                if type_mult>=2:  log_lines.append(f"Es muy efectivo! (x{type_mult})")
+                elif type_mult<1: log_lines.append(f"No es muy efectivo... (x{type_mult})")
+                log_lines.append(f"{defensor.nombre} baja {damage} de vida.")
             if move["nombre"] in ["Gigadrenado","Puno Drenaje"]:
                 d=int(damage*0.5); atacante.heal(d); log_lines.append(f"[CURACION] {atacante.nombre} absorbe {d} HP!")
             if move["nombre"]=="Pajaro Osado":
@@ -685,7 +701,20 @@ class PokemonSimulationGUI:
         self._hp_anim["blue"]["tgt"]=max(0,bp.current_hp/bp.max_hp)
         self._hp_anim["red"]["tgt"] =max(0,rp.current_hp/rp.max_hp)
 
+    def _auto_mega_ias(self):
+        if not self.blue_team or not self.red_team or self._game_over_active:
+            return
+        for poke, etiqueta, key in [
+            (self.blue_team[self.blue_active_idx], "AZUL", "blue"),
+            (self.red_team[self.red_active_idx],   "ROJO", "red"),
+        ]:
+            if poke.nombre == "Pikachu" and not poke.mega_evolved and not poke.fainted:
+                poke.mega_evolve()
+                self._log_msg(f"[MEGA] ¡El Pikachu del equipo {etiqueta} megaevolucionó a Mega Pikachu!", PKM_GOLD)
+                self._sync_hp_on_switch()
+
     def update(self):
+        self._auto_mega_ias()
         self._tick_log_lines()
         for key in ("blue","red"):
             a = self._hp_anim[key]
@@ -705,8 +734,10 @@ class PokemonSimulationGUI:
         if self.bg_surf: self.screen.blit(self.bg_surf,(0,0))
         else: self.screen.fill(BG)
 
-        self._draw_vida_panels()
+        # Sprites primero: si un GIF grande invade la zona del panel de vida,
+        # debe quedar por debajo de este
         self._draw_sprites()
+        self._draw_vida_panels()
         self._draw_cuadro()
 
     def _draw_vida_panels(self):
@@ -806,12 +837,32 @@ class PokemonSimulationGUI:
             (bp, self.rect_sprite_blue, True),
             (rp, self.rect_sprite_red,  False)
         ]:
-            gif = self._get_poke_gif(poke.nombre)
+            if getattr(poke, 'mega_evolved', False):
+                gif = self._get_poke_gif("Mega_Pikachu")
+            else:
+                gif = self._get_poke_gif(poke.nombre)
             img = gif.get_frame() if gif and gif.is_valid() else None
             if img:
                 iw, ih = img.get_size()
                 scale = min(rect.width / iw, rect.height / ih)
-                nw, nh = int(iw * scale), int(ih * scale)
+                base_nh = max(1, int(ih * scale))
+                if poke.nombre == "Pikachu" and not getattr(poke, 'mega_evolved', False):
+                    scale *= 0.5  # Pikachu es pequeño: 1/2 del tamaño estándar
+                elif poke.nombre == "Sylveon":
+                    scale *= 0.6  # Sylveon: pequeño
+                elif poke.nombre == "Mimikyu":
+                    scale *= 0.75  # Mimikyu: mediano
+                elif poke.nombre in ("Lucario", "Blaziken"):
+                    scale *= 0.88  # Lucario y Blaziken: mismo tamaño
+                elif poke.nombre in ("Groudon", "Kyogre", "Rayquaza"):
+                    scale *= 1.2  # Legendarios: más grandes (quedan bajo el panel de vida)
+                # px extra de altura por especie, proporcional
+                extra_h = {"Kyogre": 15, "Rayquaza": 10, "Groudon": 3,
+                           "Tyranitar": 5, "Gyarados": 8}.get(poke.nombre, 0)
+                if extra_h:
+                    cur_h  = max(1, int(ih * scale))
+                    scale *= (cur_h + extra_h) / cur_h
+                nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
                 if img.get_flags() & pygame.SRCALPHA:
                     scaled = pygame.transform.smoothscale(img, (nw, nh))
                 else:
@@ -819,7 +870,11 @@ class PokemonSimulationGUI:
                 if do_flip:
                     scaled = pygame.transform.flip(scaled, True, False)
                 ix = rect.x + (rect.width - nw) // 2
-                iy = rect.y + (rect.height - nh) // 2
+                if nh > base_nh:
+                    # Agrandado: crecer centrado para que no se vea más arriba
+                    iy = rect.y + (rect.height - nh) // 2
+                else:
+                    iy = rect.y + (rect.height - base_nh) // 2 + (base_nh - nh)
                 hp_key = "blue" if poke == self.blue_team[self.blue_active_idx] else "red"
                 hp_anim_done = self._hp_anim[hp_key]["cur"] <= 0.001
                 if poke.fainted and hp_anim_done:
@@ -856,6 +911,11 @@ class PokemonSimulationGUI:
                              (btn.rect.x,btn.rect.bottom),(btn.rect.right,btn.rect.bottom),1)
 
         if self.state==self.STATE_GAME_OVER:
-            f_go=pkm_font(13)
-            ci=self.cuadro_inner
-            draw_text(self.screen,self._go_msg,ci.centerx,ci.y+6,f_go,self._go_col,center=True)
+            # Mensaje de victoria en negrita, por encima del recuadro
+            f_go = get_font(13, bold=True, classic=True)
+            msg_surf = f_go.render(self._go_msg, True, self._go_col)
+            r = msg_surf.get_rect(midbottom=(self.W//2, self.rect_cuadro.y - 8))
+            banner = r.inflate(16, 10)
+            pygame.draw.rect(self.screen, (245,245,245), banner, border_radius=4)
+            pygame.draw.rect(self.screen, self._go_col, banner, 2, border_radius=4)
+            self.screen.blit(msg_surf, r)

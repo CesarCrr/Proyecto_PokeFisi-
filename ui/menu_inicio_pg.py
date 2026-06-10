@@ -47,7 +47,7 @@ class PokemonMenu:
             bg_path = os.path.join(_IMGS, "Fondos", "Fondo_Menu.jpg")
         self.bg_surf = load_bg_image(bg_path, (W, H))
 
-        logo_h = min(int(H * 0.33), 220)
+        logo_h = min(int(H * 0.33), 220) + 75
         logo_w = int(logo_h * (3953 / 3508))
         logo_path = os.path.join(_IMGS, "Logo_Pokefisi.png")
         self.logo_surf = load_image_pil(logo_path, (logo_w, logo_h), keep_alpha=True)
