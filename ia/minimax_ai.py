@@ -1,14 +1,3 @@
-"""
-minimax_ai.py — IA Nivel 4 (MinimaxAI4).
-
-Hereda MinimaxAI (Nivel 3) y sobreescribe:
-  - _evaluate: usa pesos del config en lugar de constantes
-  - _rival (RivalModel): usa parámetros del config
-  - DEPTH: tomado del config
-
-MinimaxAI (Nivel 3) NO se modifica en absoluto.
-"""
-
 import random, copy
 from ia.ia_levels  import MinimaxAI, HeuristicAI, RivalModel
 from ia.config          import load_config
@@ -29,7 +18,6 @@ def _snap_damage(atk, dfe, mv):
 
 
 class ConfiguredRivalModel(RivalModel):
-    """RivalModel con parámetros fijos desde config (sin aleatoriedad)."""
     def __init__(self, cfg: dict):
         self.agresividad = cfg["rival_agresividad"]
         self.switch_bias = cfg["rival_switch_bias"]
@@ -37,17 +25,11 @@ class ConfiguredRivalModel(RivalModel):
 
 
 class MinimaxAI4(MinimaxAI):
-    """
-    IA Nivel 4 — cerebro MinimaxAI entrenado con algoritmo genético.
-    Lee su config desde data/best_config.json (o usa DEFAULT si no existe).
-    """
-
     def __init__(self, team, enemy_pokemon, enemy_team=None, cfg: dict = None):
         super().__init__(team, enemy_pokemon, enemy_team)
         self.cfg    = cfg or load_config()
         self.DEPTH  = self.cfg["depth"]
         self._rival = ConfiguredRivalModel(self.cfg)
-        # Cargar perfil del jugador y ajustar el RivalModel
         self._perfil_jugador = cargar_perfil()
         ajustar_rival_model(self._rival, self._perfil_jugador)
 

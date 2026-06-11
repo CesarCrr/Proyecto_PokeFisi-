@@ -11,19 +11,15 @@ PERFIL_VACIO = {
     "total_turnos":   0,
     "usa_ataques":    0,
     "usa_cambios":    0,
-    "usa_estado":     0,   # movimientos sin daño (buff/debuff/estado)
+    "usa_estado":     0,   
     "cambios_por_ventaja_tipo": 0,
     "victorias_jugador": 0,
-    "agresividad":    0.5, # 0=pasivo, 1=muy agresivo
-    "tipo_jugador":   "equilibrado",  # ofensivo | defensivo | equilibrado | estratégico
-    "historial":      [],  # últimas MAX_BATALLAS batallas resumidas
+    "agresividad":    0.5, 
+    "tipo_jugador":   "equilibrado",  
+    "historial":      [],  
 }
 
-
-# ── Tracker de una batalla ────────────────────────────────────────────────
-
 class BattleTracker:
-    """Registra las acciones del jugador durante una batalla."""
 
     def __init__(self):
         self.reset()
@@ -32,11 +28,10 @@ class BattleTracker:
         self.turnos       = 0
         self.ataques      = 0
         self.cambios      = 0
-        self.uso_estado   = 0  # movimientos poder==0
-        self.cambios_ventaja = 0  # cambios donde el entrante tiene ventaja de tipo
+        self.uso_estado   = 0  
+        self.cambios_ventaja = 0  
 
     def registrar_ataque(self, move: dict, player_pokemon, enemy_pokemon):
-        """Llamar cuando el jugador usa un movimiento."""
         self.turnos  += 1
         if move.get("poder", 0) > 0:
             self.ataques += 1
@@ -44,10 +39,8 @@ class BattleTracker:
             self.uso_estado += 1
 
     def registrar_cambio(self, nuevo_pokemon, enemy_pokemon):
-        """Llamar cuando el jugador cambia de Pokémon."""
         self.cambios += 1
         self.turnos  += 1
-        # Detectar si el cambio aprovecha ventaja de tipo
         try:
             from batalla.tabla_tipos import get_type_multiplier
             mult = get_type_multiplier(
@@ -72,9 +65,6 @@ class BattleTracker:
             "ratio_cambio":         round(self.cambios / t, 3),
         }
 
-
-# ── Carga y guardado ─────────────────────────────────────────────────────
-
 def cargar_perfil() -> dict:
     if os.path.exists(MEMORIA_PATH):
         try:
@@ -93,17 +83,10 @@ def guardar_perfil(perfil: dict):
     with open(MEMORIA_PATH, "w") as f:
         json.dump(perfil, f, indent=2, ensure_ascii=False)
 
-
-# ── Actualización del perfil tras una batalla ────────────────────────────
-
 def actualizar_perfil(tracker: BattleTracker, jugador_gano: bool) -> dict:
-    """
-    Fusiona el resumen de la batalla con el perfil acumulado.
-    Devuelve el perfil actualizado.
-    """
+
     perfil = cargar_perfil()
     res    = tracker.resumen()
-
     # Agregar al historial
     entrada = {
         "turnos":               res["turnos"],
@@ -117,9 +100,7 @@ def actualizar_perfil(tracker: BattleTracker, jugador_gano: bool) -> dict:
     if len(perfil["historial"]) > MAX_BATALLAS:
         perfil["historial"] = perfil["historial"][-MAX_BATALLAS:]
 
-    # Acumular globales (ponderado: últimas batallas pesan más)
     n = len(perfil["historial"])
-    # Pesos exponenciales: la batalla más reciente pesa más
     pesos = [math.exp(0.15 * i) for i in range(n)]
     total_peso = sum(pesos)
 
@@ -139,10 +120,8 @@ def actualizar_perfil(tracker: BattleTracker, jugador_gano: bool) -> dict:
     if jugador_gano:
         perfil["victorias_jugador"] += 1
 
-    # Agresividad: ratio de ataques directos vs total de acciones
     perfil["agresividad"] = round(wa / max(wa + wc + we, 0.001), 3)
 
-    # Clasificar tipo de jugador
     if wa > 0.70:
         perfil["tipo_jugador"] = "ofensivo"
     elif wc > 0.25:
@@ -156,39 +135,29 @@ def actualizar_perfil(tracker: BattleTracker, jugador_gano: bool) -> dict:
     return perfil
 
 
-# ── Ajuste del RivalModel en MinimaxAI4 ─────────────────────────────────
+#Ajuste del RivalModel en MinimaxAI4
 
 def ajustar_rival_model(rival_model, perfil: dict):
-    """
-    Ajusta los parámetros del RivalModel de MinimaxAI4
-    según el perfil del jugador. Cuantas más batallas hay,
-    más confianza tiene el ajuste.
-    """
     if not perfil or perfil["total_batallas"] == 0:
-        return  # sin datos, no ajustar
+        return 
 
-    confianza = min(1.0, perfil["total_batallas"] / 5.0)  # máx confianza a 5 batallas
+    confianza = min(1.0, perfil["total_batallas"] / 5.0) 
     ag  = perfil["agresividad"]
     tip = perfil["tipo_jugador"]
 
-    # Ajustar agresividad: si el jugador es muy agresivo, la IA
-    # sube su presión_ko para anticipar ataques directos
     base_ag  = rival_model.agresividad
     base_ko  = rival_model.presion_ko
     base_sw  = rival_model.switch_bias
 
     if tip == "ofensivo":
-        # Jugador ataca mucho → IA prioriza KO antes de que el jugador lo haga
         nuevo_ko  = base_ko  + 0.15 * confianza
         nuevo_ag  = base_ag  + 0.10 * confianza
         nuevo_sw  = base_sw  - 0.05 * confianza
     elif tip == "defensivo":
-        # Jugador cambia mucho → IA penaliza más los cambios del rival
         nuevo_ko  = base_ko  - 0.05 * confianza
         nuevo_ag  = base_ag  - 0.05 * confianza
         nuevo_sw  = base_sw  + 0.15 * confianza
     elif tip == "estratégico":
-        # Jugador mezcla estado + cambios → IA más cautelosa
         nuevo_ko  = base_ko  + 0.05 * confianza
         nuevo_ag  = base_ag  - 0.05 * confianza
         nuevo_sw  = base_sw  + 0.10 * confianza
